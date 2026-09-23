@@ -1,14 +1,3 @@
-// Viona Bangles - Supabase Connection
-
-const SUPABASE_URL = "https://sqjbmdicbkykfqnqezss.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kQxMgjHaLLSl0n82pnFOXQ_FTXlSx2z";
-
-const supabase = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY
-);
-
-console.log("Viona Bangles connected to Supabase!");
 // Viona Bangles - Supabase
 
 const SUPABASE_URL = "https://sqjbmdicbkykfqnqezss.supabase.co";
@@ -47,8 +36,8 @@ async function loadProducts() {
         card.className = "product-card";
 
         card.innerHTML = `
-            <img 
-                src="${product["main image"] || ""}" 
+            <img
+                src="${product["main image"] || ""}"
                 alt="${product.name || "Viona Bangles"}"
             >
 
@@ -71,7 +60,6 @@ async function loadProducts() {
 
 function viewProduct(id) {
     console.log("Selected product:", id);
-    // Product detail page Task 3 mein banayenge.
 }
 
 loadProducts();
