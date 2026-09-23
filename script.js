@@ -8,58 +8,71 @@ const supabase = window.supabase.createClient(
     SUPABASE_PUBLISHABLE_KEY
 );
 
-// Load products
 async function loadProducts() {
-    const { data, error } = await supabase
-        .from("products")
-        .select("*");
-
-    if (error) {
-        console.error("Products load error:", error);
-        return;
-    }
-
-    console.log("Products:", data);
 
     const container = document.getElementById("products");
 
-    if (!container) {
-        console.error("Products container not found.");
-        return;
-    }
+    try {
 
-    container.innerHTML = "";
+        if (!container) {
+            throw new Error("Products section not found in index.html");
+        }
 
-    data.forEach(product => {
-        const card = document.createElement("div");
+        const { data, error } = await supabase
+            .from("products")
+            .select("*");
 
-        card.className = "product-card";
+        if (error) {
+            throw error;
+        }
 
-        card.innerHTML = `
-            <img
-                src="${product["main image"] || ""}"
-                alt="${product.name || "Viona Bangles"}"
-            >
+        if (!data || data.length === 0) {
+            container.innerHTML = "<p>No products found in Supabase.</p>";
+            return;
+        }
 
-            <h3>${product.name || "Unnamed Product"}</h3>
+        container.innerHTML = "";
 
-            <p>${product.category || ""}</p>
+        data.forEach(product => {
 
-            <p>Size: ${product.size || "N/A"}</p>
+            const card = document.createElement("div");
 
-            <p>${product.description || ""}</p>
+            card.className = "product-card";
 
-            <button onclick="viewProduct('${product.id}')">
-                View Product
-            </button>
+            card.innerHTML = `
+                <img
+                    src="${product["main image"] || ""}"
+                    alt="${product.name || "Viona Bangles"}"
+                    style="width:250px;"
+                >
+
+                <h3>${product.name || "Unnamed Product"}</h3>
+
+                <p>Category: ${product.category || "N/A"}</p>
+
+                <p>Size: ${product.size || "N/A"}</p>
+
+                <p>${product.description || ""}</p>
+
+                <button>
+                    View Product
+                </button>
+            `;
+
+            container.appendChild(card);
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        container.innerHTML = `
+            <p style="color:red;">
+                Error loading products: ${error.message}
+            </p>
         `;
-
-        container.appendChild(card);
-    });
-}
-
-function viewProduct(id) {
-    console.log("Selected product:", id);
+    }
 }
 
 loadProducts();
+   
