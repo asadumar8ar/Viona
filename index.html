@@ -1,25 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Viona Bangles</title>
-  <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Viona Bangles — Elegant Handcrafted Bangles</title>
+  <meta name="description" content="Viona Bangles — premium handcrafted bangles and jewellery." />
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="css/style.css" />
 </head>
+
 <body>
-  <header><h1 id="brandName"></h1></header>
 
-  <section class="hero">
-    <h2>Elegant Bangles, Made for You</h2>
-    <p>Collection jald aa raha hai.</p>
-  </section>
+  <!-- =========================================================
+       HEADER (sticky) — logo on the left, navigation on the right
+       ========================================================= -->
+  <header class="site-header">
+    <div class="header-inner">
 
-  <footer><p id="footerEmail"></p></footer>
+      <!-- Logo: image + brand name. If the image fails, onerror hides it
+           and only the text "Viona Bangles" remains. -->
+      <a href="#home" class="logo">
+        <img
+          src="images/logo.png"
+          alt="Viona Bangles logo"
+          class="logo-img"
+          height="50"
+          onerror="this.style.display='none'"
+        />
+        <!-- The text is filled from SITE_CONFIG.businessName by js/script.js -->
+        <span class="logo-text" data-site="businessName">Viona Bangles</span>
+      </a>
 
+      <!-- Hamburger button — only visible below 768px -->
+      <button
+        class="hamburger"
+        id="navToggle"
+        type="button"
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="primaryNav"
+      >☰</button>
+
+      <!-- Main navigation -->
+      <nav class="nav" id="primaryNav" aria-label="Main navigation">
+        <ul class="nav-list">
+          <li><a href="#home">Home</a></li>
+          <li><a href="#collection">Collection</a></li>
+          <li><a href="#about">About</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </nav>
+
+    </div>
+  </header>
+
+  <!-- =========================================================
+       MAIN CONTENT
+       ========================================================= -->
+  <main>
+
+    <!-- ---------- HERO (your existing hero goes here) ---------- -->
+    <section id="home" class="hero">
+      <!-- ⬇️ REPLACE this block with your existing hero markup ⬇️ -->
+      <h1>Timeless Bangles, Crafted with Love</h1>
+      <p>Handcrafted elegance for every occasion.</p>
+      <!-- ⬆️ REPLACE this block with your existing hero markup ⬆️ -->
+    </section>
+
+    <!-- ---------- COLLECTION (placeholder) ---------- -->
+    <section id="collection" class="section">
+      <h2>Collection</h2>
+      <p>Collection coming soon.</p>
+    </section>
+
+    <!-- ---------- ABOUT (placeholder) ---------- -->
+    <section id="about" class="section">
+      <h2>About</h2>
+      <p>Our story coming soon.</p>
+    </section>
+
+    <!-- ---------- CONTACT (placeholder) ---------- -->
+    <section id="contact" class="section">
+      <h2>Contact</h2>
+      <p>Contact details coming soon.</p>
+    </section>
+
+  </main>
+
+  <!-- =========================================================
+       FOOTER
+       ========================================================= -->
+  <footer class="site-footer">
+    <p>
+      &copy; <span id="year">2025</span>
+      <span data-site="businessName">Viona Bangles</span>
+    </p>
+    <p>
+      Email:
+      <a href="#" data-site="email">hello@example.com</a>
+    </p>
+  </footer>
+
+  <!-- Scripts: config first, then our behaviour file -->
   <script src="js/config.js"></script>
-  <script>
-    document.getElementById("brandName").textContent = SITE_CONFIG.businessName;
-    document.getElementById("footerEmail").textContent = SITE_CONFIG.email;
-  </script>
+  <script src="js/script.js"></script>
+
 </body>
 </html>
