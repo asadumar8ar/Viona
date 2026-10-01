@@ -1,0 +1,26 @@
+:root {
+  --primary: #1b2a4e;   /* navy */
+  --gold: #c9a24b;      /* gold */
+  --ivory: #faf6ee;     /* soft ivory */
+  --text: #2b2b2b;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: Georgia, serif;
+  background: var(--ivory);
+  color: var(--text);
+}
+
+header, footer {
+  background: var(--primary);
+  color: var(--gold);
+  text-align: center;
+  padding: 20px;
+}
+
+.hero {
+  text-align: center;
+  padding: 80px 20px;
+}
