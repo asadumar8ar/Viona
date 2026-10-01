@@ -1,26 +1,263 @@
+/* =========================================================
+   VIONA BANGLES — MAIN STYLESHEET
+   ========================================================= */
+
+/* ---------- Colour variables (kept from existing design) ---------- */
 :root {
-  --primary: #1b2a4e;   /* navy */
-  --gold: #c9a24b;      /* gold */
-  --ivory: #faf6ee;     /* soft ivory */
-  --text: #2b2b2b;
+  --primary: #1a2a4f;   /* navy */
+  --gold: #c9a227;      /* gold accent */
+  --ivory: #fdfaf5;     /* ivory background */
+  --text: #222222;      /* main text */
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* ---------- Basic reset ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth; /* smooth scrolling for anchor links */
+}
 
 body {
-  font-family: Georgia, serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--ivory);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Make images responsive by default */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* =========================================================
+   HEADER — sticky, logo left, nav right
+   ========================================================= */
+.site-header {
+  position: sticky;      /* stays at the top while scrolling */
+  top: 0;
+  z-index: 1000;
+  background: var(--ivory);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); /* subtle shadow */
+}
+
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ---------- Logo ---------- */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--primary);
+}
+
+.logo-img {
+  height: 50px;          /* about 50px as requested */
+  width: auto;
+}
+
+.logo-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+/* ---------- Desktop navigation ---------- */
+.nav-list {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  list-style: none;
+}
+
+.nav-list a {
+  position: relative;
+  text-decoration: none;
+  color: var(--primary);
+  font-weight: 500;
+  padding: 0.25rem 0;
+  transition: color 0.3s ease;
+}
+
+/* Thin gold underline animation on hover */
+.nav-list a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0;
+  height: 2px;
+  background: var(--gold);
+  transition: width 0.3s ease;
+}
+
+.nav-list a:hover {
+  color: var(--gold);
+}
+
+.nav-list a:hover::after {
+  width: 100%;
+}
+
+/* ---------- Hamburger button (hidden on desktop) ---------- */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+/* =========================================================
+   SECTIONS
+   ========================================================= */
+
+/* Sticky header height offset so headings are not covered */
+.hero,
+.section {
+  scroll-margin-top: 80px;
+}
+
+/* Hero — replace inner content later if needed */
+.hero {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 1.5rem;
+  background: var(--ivory);
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  color: var(--primary);
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.125rem;
   color: var(--text);
 }
 
-header, footer {
-  background: var(--primary);
-  color: var(--gold);
+/* Placeholder sections */
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
   text-align: center;
-  padding: 20px;
 }
 
-.hero {
+.section h2 {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.section p {
+  color: var(--text);
+}
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+.site-footer {
+  background: var(--primary);
+  color: var(--ivory);
   text-align: center;
-  padding: 80px 20px;
+  padding: 2rem 1.5rem;
+}
+
+.site-footer a {
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   MOBILE — below 768px
+   ========================================================= */
+@media (max-width: 768px) {
+  .header-inner {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Show hamburger */
+  .hamburger {
+    display: block;
+  }
+
+  /* Hide the normal nav list and make it a dropdown */
+  .nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--ivory);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .nav.is-open {
+    display: block;
+  }
+
+  .nav-list {
+    flex-direction: column;
+    gap: 0;
+    padding: 0.5rem 0;
+  }
+
+  .nav-list li {
+    width: 100%;
+  }
+
+  .nav-list a {
+    display: block;
+    padding: 0.75rem 1.5rem;
+  }
+
+  /* Disable the gold underline animation on mobile for simplicity */
+  .nav-list a::after {
+    display: none;
+  }
+
+  .nav-list a:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  .logo-text {
+    font-size: 1.1rem;
+  }
+
+  .logo-img {
+    height: 42px;
+  }
 }
