@@ -1,268 +1,194 @@
-/* ============================================================
-   Viona Bangles — script.js
-   Demo products + category filter + search
-   Supabase not ready — silently using demo products.
-   ============================================================ */
+document.addEventListener("DOMContentLoaded", () => {
+  const products = [
+    {
+      id: 1,
+      name: "VIONA Classic Glass Bangles",
+      category: "Classic",
+      price: 799,
+      sizes: ["2.2", "2.4", "2.6", "2.8"],
+      description: "Glass bangles. Sizes 2.2 to 2.8."
+    },
+    {
+      id: 2,
+      name: "VIONA Designer Glass Bangles",
+      category: "Designer",
+      price: 799,
+      sizes: ["2.2", "2.4", "2.6", "2.8"],
+      description: "Glass bangles. Sizes 2.2 to 2.8."
+    },
+    {
+      id: 3,
+      name: "VIONA Festive Glass Bangles",
+      category: "Festive",
+      price: 799,
+      sizes: ["2.2", "2.4", "2.6", "2.8"],
+      description: "Glass bangles. Sizes 2.2 to 2.8."
+    },
+    {
+      id: 4,
+      name: "VIONA Traditional Bangles",
+      category: "Traditional",
+      price: 799,
+      sizes: ["2.2", "2.4", "2.6", "2.8"],
+      description: "Glass bangles. Sizes 2.2 to 2.8."
+    },
+    {
+      id: 5,
+      name: "VIONA Wedding Glass Bangles",
+      category: "Wedding",
+      price: 799,
+      sizes: ["2.2", "2.4", "2.6", "2.8"],
+      description: "Glass bangles. Sizes 2.2 to 2.8."
+    },
+    {
+      id: 6,
+      name: "VIONA Fashion Bangles",
+      category: "Fashion",
+      price: 799,
+      sizes: ["2.2", "2.4", "2.6", "2.8"],
+      description: "Glass bangles. Sizes 2.2 to 2.8."
+    }
+  ];
 
-/* ---------- Demo products (6 items) ---------- */
-const demoProducts = [
-  {
-    id: 1,
-    code: "VB-001",
-    name: "Classic Glass Bangles",
-    category: "Glass",
-    description: "Everyday glass bangles with a smooth finish and rich colour.",
-    price: 249,
-    sizes: ["2.4", "2.6", "2.8"],
-  },
-  {
-    id: 2,
-    code: "VB-002",
-    name: "Designer Glass Bangles",
-    category: "Glass",
-    description: "Hand-painted designer glass bangles for a standout look.",
-    price: 399,
-    sizes: ["2.4", "2.6", "2.8"],
-  },
-  {
-    id: 3,
-    code: "VB-003",
-    name: "Festive Glass Bangles",
-    category: "Glass",
-    description: "Bright festive glass bangles — perfect for celebrations.",
-    price: 349,
-    sizes: ["2.4", "2.6", "2.8"],
-  },
-  {
-    id: 4,
-    code: "VB-004",
-    name: "Traditional Bangles",
-    category: "Traditional",
-    description: "Classic traditional bangles with timeless motifs.",
-    price: 499,
-    sizes: ["2.4", "2.6", "2.8"],
-  },
-  {
-    id: 5,
-    code: "VB-005",
-    name: "Wedding Glass Bangles",
-    category: "Bridal",
-    description: "Bridal glass bangles with a premium, elegant finish.",
-    price: 699,
-    sizes: ["2.4", "2.6", "2.8"],
-  },
-  {
-    id: 6,
-    code: "VB-006",
-    name: "Fashion Bangles",
-    category: "Fashion",
-    description: "Trendy fashion bangles to complete your everyday outfit.",
-    price: 299,
-    sizes: ["2.4", "2.6", "2.8"],
-  },
-];
+  const productGrid = document.getElementById("productGrid");
+  const searchInput = document.getElementById("searchInput");
+  const categoryFilters = document.getElementById("categoryFilters");
+  const sizeChips = document.getElementById("sizeChips");
+  const resultCount = document.getElementById("resultCount");
+  const noResults = document.getElementById("noResults");
 
-/* ---------- State ---------- */
-let allProducts = [...demoProducts];
-let activeCategory = "All";
-let searchTerm = "";
-const selectedSizes = {}; // productId -> selected size
-let debounceTimer = null;
+  let currentCategory = "All";
+  let currentSize = "All";
+  let searchQuery = "";
 
-/* ---------- DOM references ---------- */
-const grid = document.getElementById("product-grid");
-const categoryBar = document.getElementById("category-bar");
-const searchInput = document.getElementById("search-input");
-const clearBtn = document.getElementById("clear-search");
-const resultCount = document.getElementById("result-count");
-const noResults = document.getElementById("no-results");
-const showAllBtn = document.getElementById("show-all-btn");
-const yearEl = document.getElementById("year");
+  const whatsappNumber = "916200920746";
+  const whatsappBase = `https://wa.me/${whatsappNumber}?text=`;
 
-/* ---------- Helpers ---------- */
-function escapeHTML(str) {
-  if (str == null) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function normalizeText(str) {
-  return String(str || "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function getCategory(product) {
-  const cat = (product.category || "").trim();
-  return cat || "Other";
-}
-
-/* ---------- Filter logic (category + search) ---------- */
-function getFilteredProducts() {
-  const term = normalizeText(searchTerm);
-
-  return allProducts.filter((product) => {
-    const category = getCategory(product);
-
-    // Category match
-    const matchesCategory =
-      activeCategory === "All" || category === activeCategory;
-    if (!matchesCategory) return false;
-
-    // If no search term, show all in category
-    if (!term) return true;
-
-    // Search in name, category, description, code
-    const haystack = [
-      product.name,
-      category,
-      product.description,
-      product.code,
-    ]
-      .map(normalizeText)
-      .join(" ");
-
-    return haystack.includes(term);
-  });
-}
-
-/* ---------- Build category buttons ---------- */
-function renderCategories() {
-  const categories = ["All", ...new Set(allProducts.map(getCategory))];
-
-  categoryBar.innerHTML = categories
-    .map((cat) => {
-      const active = cat === activeCategory ? " active" : "";
-      return `<button type="button" class="category-btn${active}" data-category="${escapeHTML(
-        cat
-      )}">${escapeHTML(cat)}</button>`;
-    })
-    .join("");
-}
-
-/* ---------- Render product cards ---------- */
-function renderProducts(list) {
-  const count = list.length;
-  resultCount.textContent = `Showing ${count} bangle${count === 1 ? "" : "s"}`;
-
-  if (count === 0) {
-    grid.hidden = true;
-    noResults.hidden = false;
-    grid.innerHTML = "";
-    return;
+  function productWhatsAppLink(name, size) {
+    const text = `Hello Viona, I want to order ${name} in size ${size}`;
+    return whatsappBase + encodeURIComponent(text);
   }
 
-  grid.hidden = false;
-  noResults.hidden = true;
+  function renderProducts() {
+    if (!productGrid) return;
 
-  grid.innerHTML = list
-    .map((product) => {
-      const id = product.id;
-      const selected = selectedSizes[id] || "";
+    const query = searchQuery.trim().toLowerCase();
 
-      const sizesHtml = (product.sizes || [])
-        .map((size) => {
-          const active = size === selected ? " active" : "";
-          return `<button type="button" class="size-chip${active}" data-id="${id}" data-size="${escapeHTML(
-            size
-          )}">${escapeHTML(size)}</button>`;
-        })
-        .join("");
+    const filtered = products.filter((product) => {
+      const matchSearch =
+        !query || product.name.toLowerCase().includes(query);
+      const matchCategory =
+        currentCategory === "All" || product.category === currentCategory;
+      const matchSize =
+        currentSize === "All" || product.sizes.includes(currentSize);
 
-      const waText = encodeURIComponent(
-        `Hi Viona Bangles, I want to order:\n${product.name} (${product.code})\nSize: ${
-          selected || "not selected"
-        }\nPrice: ₹${product.price}`
-      );
-      const waHref = `https://wa.me/919999999999?text=${waText}`;
+      return matchSearch && matchCategory && matchSize;
+    });
 
-      return `
-        <article class="product-card">
-          <div class="card-img">${escapeHTML(product.name.charAt(0))}</div>
-          <div class="card-body">
-            <div class="card-category">${escapeHTML(getCategory(product))}</div>
-            <h3 class="card-title">${escapeHTML(product.name)}</h3>
-            <p class="card-desc">${escapeHTML(product.description)}</p>
-            <div class="card-code">Code: ${escapeHTML(product.code)}</div>
-            <div class="card-price">₹${escapeHTML(String(product.price))}</div>
-            <div class="size-chips">${sizesHtml}</div>
-            <a class="btn-whatsapp" href="${waHref}" target="_blank" rel="noopener">Order on WhatsApp</a>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
-}
+    productGrid.innerHTML = filtered
+      .map((product) => {
+        const sizeBadges = product.sizes
+          .map((size) => `<span class="size-badge">${size}</span>`)
+          .join("");
 
-/* ---------- Main render ---------- */
-function render() {
-  renderCategories();
-  const filtered = getFilteredProducts();
-  renderProducts(filtered);
-}
+        return `
+          <article class="product-card" data-category="${product.category}">
+            <div class="product-thumb" aria-hidden="true"><span></span></div>
+            <div class="product-body">
+              <p class="product-cat">${product.category}</p>
+              <h3 class="product-name">${product.name}</h3>
+              <p class="product-desc">${product.description}</p>
+              <div class="product-sizes" aria-label="Available sizes">
+                ${sizeBadges}
+              </div>
+              <div class="product-bottom">
+                <p class="product-price">₹${product.price}</p>
+                <a class="btn btn-whatsapp"
+                   href="${productWhatsAppLink(product.name, product.sizes[0])}"
+                   target="_blank"
+                   rel="noopener">Order on WhatsApp</a>
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
 
-/* ---------- Category bar click (delegation) ---------- */
-categoryBar.addEventListener("click", (e) => {
-  const btn = e.target.closest(".category-btn");
-  if (!btn) return;
+    const total = products.length;
+    const shown = filtered.length;
 
-  activeCategory = btn.dataset.category;
-  render();
+    if (resultCount) {
+      resultCount.textContent = `Showing ${shown} of ${total} products`;
+    }
+
+    if (noResults) {
+      noResults.hidden = shown !== 0;
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", (event) => {
+      searchQuery = event.target.value;
+      renderProducts();
+    });
+  }
+
+  if (categoryFilters) {
+    categoryFilters.addEventListener("click", (event) => {
+      const button = event.target.closest(".filter-btn");
+      if (!button) return;
+
+      currentCategory = button.dataset.category || "All";
+
+      categoryFilters.querySelectorAll(".filter-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn === button);
+      });
+
+      renderProducts();
+    });
+  }
+
+  if (sizeChips) {
+    sizeChips.addEventListener("click", (event) => {
+      const button = event.target.closest(".size-chip");
+      if (!button) return;
+
+      currentSize = button.dataset.size || "All";
+
+      sizeChips.querySelectorAll(".size-chip").forEach((btn) => {
+        btn.classList.toggle("active", btn === button);
+      });
+
+      renderProducts();
+    });
+  }
+
+  document.querySelectorAll(".faq-q").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = button.closest(".faq-item");
+      if (!item) return;
+
+      const isOpen = item.classList.toggle("open");
+      button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
+  });
+
+  const navToggle = document.getElementById("navToggle");
+  const header = document.querySelector(".site-header");
+
+  if (navToggle && header) {
+    navToggle.addEventListener("click", () => {
+      const open = header.classList.toggle("nav-open");
+      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+
+    document.querySelectorAll("#primaryNav a").forEach((link) => {
+      link.addEventListener("click", () => {
+        header.classList.remove("nav-open");
+        navToggle.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  renderProducts();
 });
-
-/* ---------- Size chip click (delegation) ---------- */
-grid.addEventListener("click", (e) => {
-  const chip = e.target.closest(".size-chip");
-  if (!chip) return;
-
-  const id = Number(chip.dataset.id);
-  const size = chip.dataset.size;
-  selectedSizes[id] = size;
-
-  // Re-render current filtered list to update active chip and WhatsApp link
-  const filtered = getFilteredProducts();
-  renderProducts(filtered);
-});
-
-/* ---------- Search input with 200ms debounce ---------- */
-searchInput.addEventListener("input", () => {
-  const value = searchInput.value;
-  clearBtn.hidden = value.trim() === "";
-
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    searchTerm = value;
-    render();
-  }, 200);
-});
-
-/* ---------- Clear (x) button ---------- */
-clearBtn.addEventListener("click", () => {
-  searchInput.value = "";
-  searchTerm = "";
-  clearBtn.hidden = true;
-  render();
-  searchInput.focus();
-});
-
-/* ---------- "Show all bangles" button ---------- */
-showAllBtn.addEventListener("click", () => {
-  searchInput.value = "";
-  searchTerm = "";
-  clearBtn.hidden = true;
-  activeCategory = "All";
-  render();
-});
-
-/* ---------- Footer year ---------- */
-if (yearEl) {
-  yearEl.textContent = new Date().getFullYear();
-}
-
-/* ---------- Init ---------- */
-render();
