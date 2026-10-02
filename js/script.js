@@ -788,4 +788,350 @@
         if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
           stepImage(dx < 0 ? 1 : -1);
         }
-      }, { passive:
+      }, { passive: true });
+    }
+
+    // Fresh order link (no size selected yet)
+    updateOrderLink();
+  }
+
+  /* ---------------------------------------------------------
+     CONFIG -> PAGE (whatsapp, phone, email, city, hours, year)
+     --------------------------------------------------------- */
+  function applyConfig() {
+    var waNumber = String(CFG.WHATSAPP_NUMBER || '');
+    var email = String(CFG.EMAIL || '');
+    var city = String(CFG.CITY || '');
+    var hours = String(CFG.HOURS || '');
+
+    // Hero WhatsApp button
+    var heroWa = $('hero-whatsapp');
+    if (heroWa) {
+      heroWa.href = waBase() + '?text=' +
+        encodeURIComponent('Hello Viona, I want to order bangles');
+    }
+
+    // Contact block
+    var cWa = $('contact-whatsapp');
+    if (cWa) cWa.href = waBase();
+    setText('contact-whatsapp-text', waNumber ? '+' + waNumber : 'WhatsApp');
+
+    var cPhone = $('contact-phone');
+    if (cPhone) cPhone.href = 'tel:+' + waNumber;
+    setText('contact-phone-text', waNumber ? '+' + waNumber : '');
+
+    var cEmail = $('contact-email');
+    if (cEmail) cEmail.href = 'mailto:' + email;
+    setText('contact-email-text', email);
+
+    setText('contact-city', city);
+    setText('contact-hours', hours);
+
+    // About block
+    setText('about-city', city);
+    setText('about-hours', hours);
+
+    // Footer
+    setText('footer-city', city);
+    setText('footer-city-text', city);
+
+    var fWa = $('footer-whatsapp');
+    if (fWa) fWa.href = waBase();
+
+    var fEmail = $('footer-email');
+    if (fEmail) fEmail.href = 'mailto:' + email;
+    setText('footer-email-text', email);
+
+    setText('footer-year', new Date().getFullYear());
+
+    // Brand fallback text (shown if logo.png is missing)
+    if (CFG.BUSINESS_NAME) {
+      setText('brand-text', String(CFG.BUSINESS_NAME).split(' ')[0]);
+    }
+  }
+
+  /* ---------------------------------------------------------
+     EVENTS
+     --------------------------------------------------------- */
+  function bindEvents() {
+    // --- mobile menu ---
+    var burger = $('hamburger');
+    var nav = $('main-nav');
+
+    if (burger && nav) {
+      burger.addEventListener('click', function () {
+        var isOpen = nav.classList.toggle('open');
+        burger.classList.toggle('active', isOpen);
+        burger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      nav.addEventListener('click', function (e) {
+        if (e.target && e.target.tagName === 'A') {
+          nav.classList.remove('open');
+          burger.classList.remove('active');
+          burger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    // --- search (200 ms debounce) ---
+    var input = $('search-input');
+    var clearBtn = $('search-clear');
+
+    if (input) {
+      input.addEventListener('input', function () {
+        if (clearBtn) clearBtn.hidden = input.value.length === 0;
+
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+          searchTerm = input.value;
+          renderProducts();
+        }, 200);
+      });
+    }
+
+    if (clearBtn && input) {
+      clearBtn.addEventListener('click', function () {
+        input.value = '';
+        searchTerm = '';
+        clearBtn.hidden = true;
+        renderProducts();
+        input.focus();
+      });
+    }
+
+    // --- category buttons (delegation) ---
+    var bar = $('category-bar');
+    if (bar) {
+      bar.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('.cat-btn') : null;
+        if (!btn) return;
+        activeCategory = btn.getAttribute('data-category') || 'All';
+        renderCategoryBar();
+        renderProducts();
+      });
+    }
+
+    // --- "show all bangles" ---
+    var showAll = $('show-all-btn');
+    if (showAll) {
+      showAll.addEventListener('click', function () {
+        activeCategory = 'All';
+        searchTerm = '';
+        if (input) input.value = '';
+        if (clearBtn) clearBtn.hidden = true;
+        renderCategoryBar();
+        renderProducts();
+      });
+    }
+
+    // --- product grid (delegation) ---
+    var grid = $('product-grid');
+    if (grid) {
+      grid.addEventListener('click', function (e) {
+        var card = e.target && e.target.closest ? e.target.closest('.product-card') : null;
+        if (!card) return;
+        openProductById(card.getAttribute('data-id'));
+      });
+
+      grid.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+        var card = e.target && e.target.closest ? e.target.closest('.product-card') : null;
+        if (!card) return;
+        e.preventDefault();
+        openProductById(card.getAttribute('data-id'));
+      });
+    }
+
+    // --- modal close: X button ---
+    var closeBtn = $('modal-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () { closeModal(true); });
+    }
+
+    // --- modal close: click on dark overlay ---
+    var overlay = $('modal-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeModal(true);
+      });
+    }
+
+    // --- FAQ accordion ---
+    var faqList = $('faq-list');
+    if (faqList) {
+      faqList.addEventListener('click', function (e) {
+        var q = e.target && e.target.closest ? e.target.closest('.faq-question') : null;
+        if (!q) return;
+
+        var item = q.parentElement;
+        var wasOpen = item.classList.contains('open');
+
+        var opened = faqList.querySelectorAll('.faq-item.open');
+        for (var i = 0; i < opened.length; i++) {
+          opened[i].classList.remove('open');
+          var oq = opened[i].querySelector('.faq-question');
+          if (oq) oq.setAttribute('aria-expanded', 'false');
+        }
+
+        if (!wasOpen) {
+          item.classList.add('open');
+          q.setAttribute('aria-expanded', 'true');
+        }
+      });
+    }
+
+    // --- keyboard: Esc closes, arrows move gallery ---
+    document.addEventListener('keydown', function (e) {
+      if (!modalOpen) return;
+      if (e.key === 'Escape') {
+        closeModal(true);
+      } else if (e.key === 'ArrowRight') {
+        stepImage(1);
+      } else if (e.key === 'ArrowLeft') {
+        stepImage(-1);
+      }
+    });
+
+    // --- browser Back / Forward ---
+    window.addEventListener('popstate', function () {
+      var code = productCodeFromHash();
+      if (code) {
+        openProductByCode(code, false);
+      } else {
+        hideModal();
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------
+     OPTIONAL SUPABASE LOAD (plain fetch REST, no library)
+     --------------------------------------------------------- */
+  function supabaseReady() {
+    var url = String(CFG.SUPABASE_URL || '');
+    var key = String(CFG.SUPABASE_ANON_KEY || '');
+    return url.indexOf('http') === 0 &&
+           url.indexOf('PASTE_') !== 0 &&
+           key.indexOf('PASTE_') !== 0 &&
+           key.length > 20;
+  }
+
+  function loadFromSupabase() {
+    var url = String(CFG.SUPABASE_URL).replace(/\/+$/, '');
+    var key = String(CFG.SUPABASE_ANON_KEY);
+
+    var headers = {
+      'apikey': key,
+      'Authorization': 'Bearer ' + key
+    };
+
+    var productsUrl = url + '/rest/v1/products?select=*&order=id.asc';
+    var reviewsUrl = url + '/rest/v1/reviews?select=*&approved=eq.true&order=created_at.desc';
+
+    var productsPromise = fetch(productsUrl, { headers: headers });
+    var reviewsPromise = fetch(reviewsUrl, { headers: headers })
+      .catch(function () { return null; });
+
+    Promise.all([productsPromise, reviewsPromise])
+      .then(function (results) {
+        var pRes = results[0];
+        var rRes = results[1];
+
+        if (!pRes || !pRes.ok) throw new Error('products request failed');
+
+        return pRes.json().then(function (rows) {
+          return { rows: rows, reviewsRes: rRes };
+        });
+      })
+      .then(function (data) {
+        var rows = data.rows;
+        if (!Array.isArray(rows) || rows.length === 0) {
+          console.warn('Viona: Supabase returned 0 products, keeping demo data.');
+          return;
+        }
+
+        allProducts = rows.map(normalizeProduct);
+
+        var rRes = data.reviewsRes;
+        if (rRes && rRes.ok) {
+          return rRes.json()
+            .then(function (reviews) { return reviews; })
+            .catch(function () { return []; });
+        }
+        return [];
+      })
+      .then(function (reviews) {
+        if (!Array.isArray(reviews)) reviews = [];
+        buildReviewMap(reviews);
+
+        renderCategoryBar();
+        renderProducts();
+
+        console.log('Viona: loaded ' + allProducts.length + ' products from Supabase.');
+      })
+      .catch(function (err) {
+        console.warn('Viona: Supabase load failed, keeping demo products.', err);
+      });
+  }
+
+  /* ---------------------------------------------------------
+     HASH ON FIRST LOAD
+     --------------------------------------------------------- */
+  function handleInitialHash() {
+    var code = productCodeFromHash();
+    if (code) openProductByCode(code, false);
+  }
+
+  /* ---------------------------------------------------------
+     INIT
+     --------------------------------------------------------- */
+  function init() {
+    // 1. Business data into the page
+    try {
+      applyConfig();
+    } catch (e) {
+      console.warn('Viona: applyConfig failed', e);
+    }
+
+    // 2. Demo products render immediately — page is never empty
+    try {
+      allProducts = buildDemoProducts();
+      buildReviewMap([]);
+      renderCategoryBar();
+      renderProducts();
+    } catch (e) {
+      console.warn('Viona: initial render failed', e);
+    }
+
+    console.log('Viona site loaded, products:', allProducts.length);
+
+    // 3. Interactions
+    try {
+      bindEvents();
+    } catch (e) {
+      console.warn('Viona: bindEvents failed', e);
+    }
+
+    // 4. Deep link (#product=VB-001)
+    try {
+      handleInitialHash();
+    } catch (e) {
+      console.warn('Viona: hash handling failed', e);
+    }
+
+    // 5. Optional real data (silent if not configured / unreachable)
+    if (supabaseReady()) {
+      loadFromSupabase();
+    } else {
+      console.log('Viona: Supabase not configured — using demo products.');
+    }
+  }
+
+  // Scripts use defer, so the DOM is ready — but stay safe anyway.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
