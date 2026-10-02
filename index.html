@@ -3,131 +3,110 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Viona Bangles | Glass Bangles Collection</title>
+  <meta name="description" content="Viona Bangles - glass bangles in classic, festive and wedding designs. Choose your size and order easily on WhatsApp." />
 
-  <title>Viona Bangles — Elegant Handcrafted Bangles</title>
-  <meta name="description" content="Viona Bangles — premium handcrafted bangles and jewellery." />
-
-  <!-- Main stylesheet -->
+  <!-- Styles -->
   <link rel="stylesheet" href="css/style.css" />
 </head>
-
 <body>
 
-  <!-- =========================================================
-       HEADER (sticky) — logo on the left, navigation on the right
-       ========================================================= -->
-  <header class="site-header">
-    <div class="header-inner">
+  <!-- ================= HEADER ================= -->
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a href="#home" class="logo">Viona <span>Bangles</span></a>
 
-      <!-- Logo: image + brand name. If the image fails, onerror hides it
-           and only the text "Viona Bangles" remains. -->
-      <a href="#home" class="logo">
-        <img
-          src="images/logo.png"
-          alt="Viona Bangles logo"
-          class="logo-img"
-          height="50"
-          onerror="this.style.display='none'"
-        />
-        <!-- The text is filled from SITE_CONFIG.businessName by js/script.js -->
-        <span class="logo-text" data-site="businessName">Viona Bangles</span>
-      </a>
+      <button class="nav-toggle" id="nav-toggle" type="button"
+              aria-label="Open menu" aria-expanded="false" aria-controls="main-nav">
+        <span></span><span></span><span></span>
+      </button>
 
-      <!-- Hamburger button — only visible below 768px -->
-      <button
-        class="hamburger"
-        id="navToggle"
-        type="button"
-        aria-label="Open menu"
-        aria-expanded="false"
-        aria-controls="primaryNav"
-      >☰</button>
-
-      <!-- Main navigation -->
-      <nav class="nav" id="primaryNav" aria-label="Main navigation">
-        <ul class="nav-list">
-          <li><a href="#home">Home</a></li>
-          <li><a href="#collection">Collection</a></li>
-          <li><a href="#about">About</a></li>
-          <li><a href="#contact">Contact</a></li>
-        </ul>
+      <nav class="main-nav" id="main-nav">
+        <a href="#home">Home</a>
+        <a href="#collections">Collections</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
       </nav>
-
     </div>
   </header>
 
- <!-- ===== HERO SECTION ===== -->
- <section id="hero">
-  <div class="hero-inner">
-    <p class="hero-label">ELEGANT BANGLES</p>
-    <h1 class="hero-title">Made for You</h1>
-    <p class="hero-sub">
-      Glass, bridal and kundan bangles, matched to your dress. Delivered all over India.
-    </p>
-
-    <div class="hero-btns">
-      <a href="#collections" class="btn-gold">Shop Collection</a>
-      <a href="https://wa.me/916200920746?text=Hello%20Viona%2C%20I%20want%20to%20order%20bangles"
-         target="_blank" rel="noopener" class="btn-outline">Order on WhatsApp</a>
-    </div>
-
-    <ul class="hero-trust">
-      <li>🚚 All India Delivery</li>
-      <li>🔄 Easy Exchange</li>
-      <li>✨ Made for Women</li>
-    </ul>
-  </div>
-</section>
-  <!-- =========================================================
-       MAIN CONTENT
-       ========================================================= -->
   <main>
 
-    <!-- ---------- HERO (your existing hero goes here) ---------- -->
-    <section id="home" class="hero">
-      <!-- ⬇️ REPLACE this block with your existing hero markup ⬇️ -->
-      <h1>Timeless Bangles, Crafted with Love</h1>
-      <p>Handcrafted elegance for every occasion.</p>
-      <!-- ⬆️ REPLACE this block with your existing hero markup ⬆️ -->
+    <!-- ================= HERO ================= -->
+    <section class="hero" id="home">
+      <div class="container hero-inner">
+        <p class="hero-label">Glass Bangles &bull; Classic &amp; Festive</p>
+        <h1 class="hero-title">Elegance, Wrapped Around Your Wrist</h1>
+        <p class="hero-text">
+          Explore our collection of glass bangles in classic, festive and wedding designs.
+          Pick your size, tap once, and order directly on WhatsApp.
+        </p>
+        <div class="hero-buttons">
+          <a href="#collections" class="btn btn-gold">Explore Collections</a>
+          <a href="#" id="hero-whatsapp" class="btn btn-outline">Order on WhatsApp</a>
+        </div>
+      </div>
     </section>
 
-    <!-- ---------- COLLECTION (placeholder) ---------- -->
-    <section id="collection" class="section">
-      <h2>Collection</h2>
-      <p>Collection coming soon.</p>
+    <!-- ================= COLLECTIONS ================= -->
+    <section class="collections" id="collections">
+      <div class="container">
+
+        <p class="section-label">OUR COLLECTION</p>
+        <h2 class="section-title">Bangles Made for You</h2>
+        <p class="section-subtitle">Choose your style. Order easily on WhatsApp.</p>
+
+        <!-- Loading text -->
+        <p class="loading-text" id="loading-text">Loading bangles...</p>
+
+        <!-- Product cards are rendered here by js/script.js -->
+        <div class="product-grid" id="product-grid"></div>
+
+        <!-- Error / empty message area -->
+        <p class="message-area" id="message-area" role="status" aria-live="polite"></p>
+
+      </div>
     </section>
 
-    <!-- ---------- ABOUT (placeholder) ---------- -->
-    <section id="about" class="section">
-      <h2>About</h2>
-      <p>Our story coming soon.</p>
+    <!-- ================= ABOUT ================= -->
+    <section class="about" id="about">
+      <div class="container">
+        <p class="section-label">ABOUT</p>
+        <h2 class="section-title">About Viona Bangles</h2>
+        <p class="section-subtitle">
+          Viona Bangles brings together glass bangles in classic, festive and wedding styles.
+          Every design is listed with its size options, so you can pick what suits you and
+          confirm your order on WhatsApp in a single message.
+        </p>
+      </div>
     </section>
 
-    <!-- ---------- CONTACT (placeholder) ---------- -->
-    <section id="contact" class="section">
-      <h2>Contact</h2>
-      <p>Contact details coming soon.</p>
+    <!-- ================= CONTACT ================= -->
+    <section class="contact" id="contact">
+      <div class="container">
+        <p class="section-label">CONTACT</p>
+        <h2 class="section-title">Order or Ask a Question</h2>
+        <p class="section-subtitle">
+          Send us a message on WhatsApp and we will get back to you.
+        </p>
+        <div class="contact-actions">
+          <a href="#" id="contact-whatsapp" class="btn btn-gold">Chat on WhatsApp</a>
+        </div>
+      </div>
     </section>
 
   </main>
 
-  <!-- =========================================================
-       FOOTER
-       ========================================================= -->
+  <!-- ================= FOOTER ================= -->
   <footer class="site-footer">
-    <p>
-      &copy; <span id="year">2025</span>
-      <span data-site="businessName">Viona Bangles</span>
-    </p>
-    <p>
-      Email:
-      <a href="#" data-site="email">hello@example.com</a>
-    </p>
+    <div class="container footer-inner">
+      <p class="footer-brand">Viona Bangles</p>
+      <p class="footer-note">&copy; <span id="footer-year">2025</span> Viona Bangles. All rights reserved.</p>
+    </div>
   </footer>
 
-  <!-- Scripts: config first, then our behaviour file -->
-  <script src="js/config.js"></script>
-  <script src="js/script.js"></script>
-
+  <!-- Scripts: config first, then script -->
+  <script src="js/config.js" defer></script>
+  <script src="js/script.js" defer></script>
 </body>
 </html>
