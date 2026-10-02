@@ -1,13 +1,17 @@
-/* ============================================================
-   VIONA BANGLES — CONFIGURATION
-   Replace the two placeholder values below when Supabase is ready.
-   ============================================================ */
+/* =========================================================
+   Viona Bangles — js/config.js
+   ALL business data lives here. Nothing is hard-coded elsewhere.
+   ========================================================= */
 
-const CONFIG = {
+window.VIONA_CONFIG = {
   BUSINESS_NAME: "Viona Bangles",
   WHATSAPP_NUMBER: "916200920746",
+  EMAIL: "vionabangles@gmail.com",
+  CITY: "Gaya, Bihar",
+  HOURS: "10:00 AM - 7:00 PM",
 
-  // 🔴 REPLACE THESE TWO LINES LATER:
-  SUPABASE_URL: "PASTE_YOUR_SUPABASE_URL",
-  SUPABASE_ANON_KEY: "PASTE_YOUR_SUPABASE_ANON_KEY",
+  /* Leave these as PASTE_... and the site runs on demo products.
+     Put real values in to load products from Supabase. */
+  SUPABASE_URL: "sqjbmdicbkykfqnqezss",
+  SUPABASE_ANON_KEY: "sb_publishable_kQxMgjHaLLSl0n82pnFOXQ_FTXlSx2z"
 };
