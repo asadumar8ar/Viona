@@ -261,3 +261,111 @@ img {
     height: 42px;
   }
 }
+
+/* ===== HERO SECTION ===== */
+#hero{
+  position: relative;
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 70px 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(201,162,74,.30), transparent 60%),
+    radial-gradient(ellipse at 50% 110%, rgba(201,162,74,.14), transparent 55%),
+    var(--navy, #14224A);
+  animation: heroFade .9s ease-out both;
+}
+
+@keyframes heroFade{
+  from{ opacity: 0; transform: translateY(18px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+
+.hero-inner{ max-width: 720px; }
+
+.hero-label{
+  margin: 0 0 18px;
+  font-size: .78rem;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: var(--gold, #C9A24A);
+}
+
+.hero-title{
+  margin: 0 0 18px;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--ivory, #FBF6EA);
+}
+
+.hero-sub{
+  max-width: 520px;
+  margin: 0 auto 34px;
+  font-size: clamp(.95rem, 2.2vw, 1.1rem);
+  line-height: 1.7;
+  color: rgba(251,246,234,.78);
+}
+
+.hero-btns{
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.hero-btns a{
+  display: inline-block;
+  box-sizing: border-box;
+  padding: 14px 30px;
+  border-radius: 40px;
+  font-size: .95rem;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-decoration: none;
+  transition: all .25s ease;
+}
+
+.btn-gold{
+  background: var(--gold, #C9A24A);
+  border: 1px solid var(--gold, #C9A24A);
+  color: var(--navy, #14224A);
+}
+.btn-gold:hover{
+  background: #E0BC63;
+  border-color: #E0BC63;
+  transform: translateY(-2px);
+}
+
+.btn-outline{
+  background: transparent;
+  border: 1px solid var(--gold, #C9A24A);
+  color: var(--gold, #C9A24A);
+}
+.btn-outline:hover{
+  background: rgba(201,162,74,.12);
+  transform: translateY(-2px);
+}
+
+.hero-trust{
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 28px;
+  margin: 38px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: .85rem;
+  color: rgba(251,246,234,.72);
+}
+.hero-trust li{ display: flex; align-items: center; gap: 7px; }
+
+@media (max-width: 520px){
+  #hero{ min-height: auto; padding: 60px 18px 70px; }
+  .hero-btns{ flex-direction: column; }
+  .hero-btns a{ width: 100%; }
+}
