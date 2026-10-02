@@ -3,25 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Viona Bangles | Glass Bangles Collection</title>
-  <meta name="description" content="Viona Bangles - glass bangles in classic, festive and wedding designs. Choose your size and order easily on WhatsApp." />
-
-  <!-- Styles -->
+  <title>Viona Bangles — Elegant Bangles for Every Moment</title>
+  <meta name="description" content="Viona Bangles — handpicked glass, traditional, bridal and fashion bangles. Choose your size and order easily on WhatsApp." />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
   <!-- ================= HEADER ================= -->
-  <header class="site-header" id="site-header">
+  <header class="site-header">
     <div class="container header-inner">
       <a href="#home" class="logo">Viona <span>Bangles</span></a>
-
-      <button class="nav-toggle" id="nav-toggle" type="button"
-              aria-label="Open menu" aria-expanded="false" aria-controls="main-nav">
-        <span></span><span></span><span></span>
-      </button>
-
-      <nav class="main-nav" id="main-nav">
+      <nav class="main-nav">
         <a href="#home">Home</a>
         <a href="#collections">Collections</a>
         <a href="#about">About</a>
@@ -33,65 +25,86 @@
   <main>
 
     <!-- ================= HERO ================= -->
-    <section class="hero" id="home">
+    <section id="home" class="hero">
       <div class="container hero-inner">
-        <p class="hero-label">Glass Bangles &bull; Classic &amp; Festive</p>
-        <h1 class="hero-title">Elegance, Wrapped Around Your Wrist</h1>
+        <p class="hero-tag">Handpicked &bull; Elegant &bull; Affordable</p>
+        <h1>Bangles that complete <span>every look</span></h1>
         <p class="hero-text">
-          Explore our collection of glass bangles in classic, festive and wedding designs.
-          Pick your size, tap once, and order directly on WhatsApp.
+          Glass, traditional, bridal and fashion bangles — choose your size
+          and order directly on WhatsApp.
         </p>
-        <div class="hero-buttons">
-          <a href="#collections" class="btn btn-gold">Explore Collections</a>
-          <a href="#" id="hero-whatsapp" class="btn btn-outline">Order on WhatsApp</a>
-        </div>
+        <a href="#collections" class="btn-gold">Explore Collections</a>
       </div>
     </section>
 
     <!-- ================= COLLECTIONS ================= -->
-    <section class="collections" id="collections">
+    <section id="collections" class="collections">
       <div class="container">
 
-        <p class="section-label">OUR COLLECTION</p>
-        <h2 class="section-title">Bangles Made for You</h2>
-        <p class="section-subtitle">Choose your style. Order easily on WhatsApp.</p>
+        <h2 class="section-title">Our Collections</h2>
+        <p class="section-sub">Search or pick a category to find your perfect bangles.</p>
 
-        <!-- Loading text -->
-        <p class="loading-text" id="loading-text">Loading bangles...</p>
+        <!-- Search box -->
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+          </svg>
 
-        <!-- Product cards are rendered here by js/script.js -->
-        <div class="product-grid" id="product-grid"></div>
+          <input id="search-input" type="search" placeholder="Search bangles..."
+                 autocomplete="off" aria-label="Search bangles" />
 
-        <!-- Error / empty message area -->
-        <p class="message-area" id="message-area" role="status" aria-live="polite"></p>
+          <button id="clear-search" type="button" aria-label="Clear search" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                 stroke-linecap="round" aria-hidden="true">
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Category bar (buttons are created by JS) -->
+        <div id="category-bar" class="category-bar" aria-label="Product categories"></div>
+
+        <!-- Result count -->
+        <p id="result-count"></p>
+
+        <!-- Product grid -->
+        <div id="product-grid" class="product-grid"></div>
+
+        <!-- No results box -->
+        <div id="no-results" class="no-results" hidden>
+          <p>No bangles found. Try another word or category.</p>
+          <button id="show-all-btn" class="btn-gold" type="button">Show all bangles</button>
+        </div>
 
       </div>
     </section>
 
     <!-- ================= ABOUT ================= -->
-    <section class="about" id="about">
-      <div class="container">
-        <p class="section-label">ABOUT</p>
+    <section id="about" class="about">
+      <div class="container about-inner">
         <h2 class="section-title">About Viona Bangles</h2>
-        <p class="section-subtitle">
-          Viona Bangles brings together glass bangles in classic, festive and wedding styles.
-          Every design is listed with its size options, so you can pick what suits you and
-          confirm your order on WhatsApp in a single message.
+        <p>
+          Viona Bangles is a small, carefully curated bangle store. Every piece is
+          picked for its finish, comfort and colour — from everyday glass bangles
+          to complete bridal sets.
         </p>
       </div>
     </section>
 
     <!-- ================= CONTACT ================= -->
-    <section class="contact" id="contact">
-      <div class="container">
-        <p class="section-label">CONTACT</p>
-        <h2 class="section-title">Order or Ask a Question</h2>
-        <p class="section-subtitle">
-          Send us a message on WhatsApp and we will get back to you.
+    <section id="contact" class="contact">
+      <div class="container contact-inner">
+        <h2 class="section-title">Order &amp; Enquiries</h2>
+        <p>
+          Pick your size on any bangle and tap &ldquo;Order on WhatsApp&rdquo;.
+          We will confirm availability and delivery details there.
         </p>
-        <div class="contact-actions">
-          <a href="#" id="contact-whatsapp" class="btn btn-gold">Chat on WhatsApp</a>
-        </div>
+        <a id="contact-whatsapp" class="btn-gold" href="#" target="_blank" rel="noopener">
+          Chat on WhatsApp
+        </a>
       </div>
     </section>
 
@@ -99,14 +112,11 @@
 
   <!-- ================= FOOTER ================= -->
   <footer class="site-footer">
-    <div class="container footer-inner">
-      <p class="footer-brand">Viona Bangles</p>
-      <p class="footer-note">&copy; <span id="footer-year">2025</span> Viona Bangles. All rights reserved.</p>
+    <div class="container">
+      <p>&copy; <span id="year"></span> Viona Bangles. All rights reserved.</p>
     </div>
   </footer>
 
-  <!-- Scripts: config first, then script -->
-  <script src="js/config.js" defer></script>
-  <script src="js/script.js" defer></script>
+  <script src="js/script.js"></script>
 </body>
 </html>
