@@ -1,448 +1,500 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Viona Bangles — Premium Bangles from Gaya, Bihar</title>
-
-<!-- SEO / social -->
-<meta name="description" content="Viona Bangles — premium handcrafted glass, traditional and bridal bangles from Gaya, Bihar. Order easily on WhatsApp." />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Viona Bangles — Premium Handcrafted Bangles from Gaya, Bihar</title>
+<meta name="description" content="Viona Bangles — premium handcrafted glass and traditional bangles from Gaya, Bihar. Timeless designs, handpicked for every occasion." />
 <meta name="theme-color" content="#14224A" />
-<meta property="og:title" content="Viona Bangles" />
-<meta property="og:description" content="Premium handcrafted bangles from Gaya, Bihar." />
-<meta property="og:type" content="website" />
 
-<!-- Favicon: the gold V-leaf on navy, drawn as an inline SVG (no image file) -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 115 96'%3E%3Crect width='115' height='96' fill='%2314224A'/%3E%3Cpath d='M2 14 C30 12 52 40 58 92 C40 80 14 50 2 14 Z' fill='%23C9A24A'/%3E%3Cpath d='M62 90 C56 60 70 22 112 4 C100 36 90 70 62 90 Z' fill='%23C9A24A'/%3E%3C/svg%3E" />
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="images/favicon.png" />
+<link rel="apple-touch-icon" href="images/favicon.png" />
 
-<!-- Google Fonts: Playfair Display for headings, Poppins for body -->
+<!-- Google Fonts: Playfair Display (headings) + Poppins (body) -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
+<!-- Site styles -->
 <link rel="stylesheet" href="css/style.css" />
 </head>
-<body id="top">
+<body>
 
-<!-- ======================================================================
-     HIDDEN SVG SYMBOL — the Viona "V" made of two leaf shapes.
-     Defined once and reused everywhere with <use href="#v-leaf">.
-     ====================================================================== -->
-<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true" focusable="false">
-  <symbol id="v-leaf" viewBox="0 0 115 96">
-    <path d="M2 14 C30 12 52 40 58 92 C40 80 14 50 2 14 Z" />
-    <path d="M62 90 C56 60 70 22 112 4 C100 36 90 70 62 90 Z" />
-  </symbol>
-</svg>
+<!-- ==========================================================================
+     OFFER STRIP (thin announcement bar above the header)
+     Filled by js/script.js. Stays hidden and takes ZERO space when no
+     active "strip" message exists in the database.
+     ========================================================================== -->
+<div id="offerStripRoot" class="offer-strip-root" aria-live="polite"></div>
 
-<!-- ======================================================================
-     OFFER STRIP (thin announcement bar above the header).
-     js/script.js fills this. If there is no active strip, it stays empty
-     and takes zero space — no heading, no placeholder text.
-     ====================================================================== -->
-<div id="strip-root" class="strip-root"></div>
-
-<!-- ======================================================================
-     HEADER — sticky navy bar
-     Row 1 (mobile): logo + hamburger
-     Row 2 (mobile): full-width search bar
-     Desktop: logo | big search bar | nav links + WhatsApp
-     ====================================================================== -->
-<header class="site-header" id="site-header">
+<!-- ==========================================================================
+     SITE HEADER — sticky navy bar
+     Mobile : row 1 = logo + hamburger | row 2 = full width search bar
+     Desktop: logo left | big search centre | nav right
+     ========================================================================== -->
+<header class="site-header" id="siteHeader">
   <div class="header-inner">
 
-    <a class="brand" href="#top" aria-label="Viona Bangles — home">
-      <!-- Viona wordmark: gold leaf-V + "iona" -->
-      <span class="wordmark wordmark--gold">
-        <svg class="wordmark__v" viewBox="0 0 115 96" aria-hidden="true"><use href="#v-leaf"></use></svg>
-        <span class="wordmark__text">iona</span>
-      </span>
+    <!-- Brand / logo -->
+    <a class="brand" href="#top" aria-label="Viona Bangles home">
+      <img src="images/logo-gold.png"
+           alt="Viona Bangles"
+           class="wordmark-img header-logo"
+           id="headerLogo"
+           onerror="this.style.display='none';var f=document.getElementById('headerLogoFallback');if(f){f.hidden=false;}" />
+      <span class="brand-fallback" id="headerLogoFallback" hidden>Viona</span>
     </a>
 
-    <!-- Search: white rounded bar with gold focus ring -->
-    <div class="header-search">
-      <form class="search-form" id="search-form" role="search" autocomplete="off">
-        <span class="search-form__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+    <!-- Mobile hamburger -->
+    <button class="hamburger" id="hamburgerBtn" type="button"
+            aria-label="Open menu" aria-expanded="false" aria-controls="headerNav">
+      <span></span><span></span><span></span>
+    </button>
+
+    <!-- Big rounded search bar -->
+    <div class="search-wrap" id="searchWrap">
+      <form class="search-form" id="searchForm" role="search" autocomplete="off">
+        <span class="search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
           </svg>
         </span>
-        <input
-          type="search"
-          id="search-input"
-          class="search-form__input"
-          placeholder="Search bangles, categories, VB-001..."
-          aria-label="Search bangles"
-          aria-autocomplete="list"
-          aria-controls="search-suggest"
-          aria-expanded="false"
-        />
-        <button type="button" class="search-form__clear" id="search-clear" aria-label="Clear search" hidden>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-            <line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line>
-          </svg>
+        <input type="text"
+               id="searchInput"
+               class="search-input"
+               placeholder="Search bangles, categories…"
+               aria-label="Search bangles"
+               aria-autocomplete="list"
+               aria-controls="searchSuggest"
+               aria-expanded="false" />
+        <button type="button" class="search-clear" id="searchClear"
+                aria-label="Clear search" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"></line>
+            <line x1="18" y1="6" x2="6" y2="18"></line></svg>
         </button>
       </form>
-
       <!-- Live suggestions dropdown -->
-      <div class="search-suggest" id="search-suggest" role="listbox" hidden></div>
+      <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
     </div>
 
-    <!-- Desktop navigation -->
-    <nav class="header-nav" id="header-nav" aria-label="Main">
-      <a href="#collections" class="header-nav__link">Collections</a>
-      <a href="#contact" class="header-nav__link">Contact</a>
-      <a href="#" class="header-nav__wa" id="header-whatsapp" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-          <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm0 18.02h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.11.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.35c0-4.54 3.7-8.24 8.24-8.24 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.39.11-.51.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.22.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.57.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.22-.17-.47-.29Z"/>
+    <!-- Navigation -->
+    <nav class="header-nav" id="headerNav" aria-label="Main navigation">
+      <a href="#collections" class="nav-link" data-nav-close>Collections</a>
+      <a href="#contact" class="nav-link" data-nav-close>Contact</a>
+      <a class="nav-wa" id="headerWhatsApp" href="#" target="_blank" rel="noopener"
+         aria-label="Chat on WhatsApp">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
         </svg>
       </a>
     </nav>
 
-    <!-- Mobile hamburger -->
-    <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
-      <span></span><span></span><span></span>
-    </button>
   </div>
 
-  <!-- Mobile dropdown menu -->
-  <nav class="mobile-menu" id="mobile-menu" hidden aria-label="Mobile">
-    <a href="#collections" class="mobile-menu__link">Collections</a>
-    <a href="#about" class="mobile-menu__link">About</a>
-    <a href="#faq" class="mobile-menu__link">FAQ</a>
-    <a href="#contact" class="mobile-menu__link">Contact</a>
-    <a href="#" class="mobile-menu__link mobile-menu__link--wa" id="mobile-whatsapp" target="_blank" rel="noopener">WhatsApp us</a>
-  </nav>
+  <!-- Tanishq-style category strip (built automatically by JS) -->
+  <div class="category-strip" id="categoryStrip" hidden>
+    <div class="category-strip-inner" id="categoryStripInner" role="tablist"
+         aria-label="Product categories"></div>
+  </div>
 </header>
 
-<!-- ======================================================================
-     CATEGORY STRIP — Tanishq style. Built automatically from the products.
-     Horizontal scroll on mobile. Clicking filters the grid.
-     ====================================================================== -->
-<nav class="cat-strip" id="category-strip" aria-label="Categories">
-  <div class="cat-strip__inner" id="category-strip-inner">
-    <!-- filled by js/script.js -->
+<!-- ==========================================================================
+     BANNER CAROUSEL
+     Filled by js/script.js. Completely removed from the layout when no active
+     "banner" message exists in the database.
+     ========================================================================== -->
+<section class="banner-section" id="bannerSection" hidden aria-label="Highlights">
+  <div class="container">
+    <div class="banner-carousel" id="bannerCarousel">
+      <div class="banner-track" id="bannerTrack"></div>
+      <button class="banner-arrow prev" id="bannerPrev" type="button" aria-label="Previous">&#8249;</button>
+      <button class="banner-arrow next" id="bannerNext" type="button" aria-label="Next">&#8250;</button>
+      <div class="banner-dots" id="bannerDots" role="tablist" aria-label="Banner slides"></div>
+    </div>
   </div>
-</nav>
+</section>
 
-<!-- ======================================================================
-     MAIN CONTENT
-     ====================================================================== -->
-<main id="main">
+<main id="top">
 
-  <!-- Banner carousel root. If no active banner, this stays empty. -->
-  <section class="banner-root" id="banner-root" aria-label="Featured"></section>
-
-  <!-- ------------------------------- HERO ------------------------------- -->
+  <!-- ========================================================================
+       HERO
+       ======================================================================== -->
   <section class="hero" id="hero">
-    <div class="container hero__inner">
-      <span class="wordmark wordmark--navy hero__mark" aria-hidden="true">
-        <svg class="wordmark__v" viewBox="0 0 115 96"><use href="#v-leaf"></use></svg>
-        <span class="wordmark__text">iona</span>
-      </span>
-      <p class="hero__label" id="hero-label">Handcrafted in Gaya, Bihar</p>
-      <h1 class="hero__heading" id="hero-heading">Timeless Bangles, Made for You</h1>
-      <p class="hero__text" id="hero-text">
-        Premium glass, traditional and bridal bangles — handcrafted with care
-        and delivered across India.
+    <div class="hero-inner container">
+      <img src="images/logo-gold.png"
+           alt="Viona Bangles"
+           class="wordmark-img hero-logo"
+           id="heroLogo"
+           onerror="this.style.display='none';var f=document.getElementById('heroLogoFallback');if(f){f.hidden=false;}" />
+      <span class="brand-fallback hero-fallback" id="heroLogoFallback" hidden>Viona</span>
+
+      <p class="hero-label" id="heroLabel">Handcrafted in Gaya, Bihar</p>
+      <h1 class="hero-heading" id="heroHeading">Timeless Bangles, Made for You</h1>
+      <p class="hero-text" id="heroText">
+        Premium glass and traditional bangles, handpicked for every occasion.
       </p>
-      <div class="hero__actions">
-        <a href="#collections" class="btn btn--gold">Explore Collections</a>
-        <a href="#" class="btn btn--ghost" id="hero-whatsapp" target="_blank" rel="noopener">Chat on WhatsApp</a>
+
+      <div class="hero-actions">
+        <a href="#collections" class="btn btn-gold">Shop Collections</a>
+        <a href="#" id="heroWhatsApp" class="btn btn-outline"
+           target="_blank" rel="noopener">WhatsApp Us</a>
       </div>
     </div>
+    <div class="hero-rule" aria-hidden="true"></div>
   </section>
 
-  <!-- ------------------------------ TRUST ------------------------------- -->
-  <section class="trust" id="trust">
-    <div class="container trust__grid" id="trust-grid">
-      <!-- filled by js/script.js -->
+  <!-- ========================================================================
+       TRUST POINTS (hidden when empty)
+       ======================================================================== -->
+  <section class="trust" id="trustSection" hidden>
+    <div class="container">
+      <ul class="trust-list" id="trustList"></ul>
     </div>
   </section>
 
-  <!-- ------------------------------ ABOUT ------------------------------- -->
-  <section class="about" id="about">
-    <div class="container about__inner">
-      <div class="about__title-wrap">
-        <span class="wordmark wordmark--navy about__mark" aria-hidden="true">
-          <svg class="wordmark__v" viewBox="0 0 115 96"><use href="#v-leaf"></use></svg>
-          <span class="wordmark__text">iona</span>
-        </span>
-        <h2 class="section-title">About Viona Bangles</h2>
-      </div>
-      <p class="about__text" id="about-text">
-        Viona Bangles is a small family studio in Gaya, Bihar. Every bangle is
-        finished by hand, checked for shine and packed with love before it
-        travels to you.
-      </p>
-    </div>
-  </section>
-
-  <!-- --------------------------- COLLECTIONS ---------------------------- -->
+  <!-- ========================================================================
+       COLLECTIONS
+       ======================================================================== -->
   <section class="collections" id="collections">
     <div class="container">
-      <h2 class="section-title">Our Collections</h2>
-      <p class="section-sub" id="showing-count">Showing 0 bangles</p>
 
-      <div class="product-grid" id="product-grid">
-        <!-- filled by js/script.js -->
+      <header class="section-head">
+        <p class="section-label">Our Collection</p>
+        <h2 class="section-title">Handpicked Bangles</h2>
+        <div class="gold-rule" aria-hidden="true"></div>
+      </header>
+
+      <!-- Live count + active filter note -->
+      <p class="showing" id="showingCount">Showing 0 bangles</p>
+
+      <!-- Product grid -->
+      <div class="product-grid" id="productGrid"></div>
+
+      <!-- Loading skeletons -->
+      <div class="product-grid" id="productSkeletons">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
       </div>
 
-      <!-- Friendly skeleton while loading -->
-      <div class="grid-skeleton" id="grid-skeleton">
-        <div class="skel-card"></div><div class="skel-card"></div>
-        <div class="skel-card"></div><div class="skel-card"></div>
+      <!-- No results box -->
+      <div class="empty-box" id="emptyBox" hidden>
+        <div class="empty-mark" aria-hidden="true">✦</div>
+        <p class="empty-title">No bangles found</p>
+        <p class="empty-text">Try a different search word or pick another category.</p>
+        <button class="btn btn-gold" id="emptyReset" type="button">Show all bangles</button>
       </div>
 
-      <div class="no-results" id="no-results" hidden>
-        <p class="no-results__title">No bangles found</p>
-        <p class="no-results__text">Try another search word or pick a different category.</p>
-        <button class="btn btn--gold" id="no-results-reset" type="button">Show all bangles</button>
-      </div>
     </div>
   </section>
 
-  <!-- ------------------------------- FAQ -------------------------------- -->
+  <!-- ========================================================================
+       ABOUT
+       ======================================================================== -->
+  <section class="about" id="about">
+    <div class="container about-inner">
+
+      <div class="about-media">
+        <img src="images/logo-navy.png"
+             alt="Viona Bangles"
+             class="wordmark-img about-logo"
+             id="aboutLogo"
+             onerror="this.style.display='none';var f=document.getElementById('aboutLogoFallback');if(f){f.hidden=false;}" />
+        <span class="brand-fallback navy about-fallback" id="aboutLogoFallback" hidden>Viona</span>
+        <p class="about-media-line">ELEGANT BANGLES</p>
+        <p class="about-media-sub">Made for You</p>
+      </div>
+
+      <div class="about-text">
+        <p class="section-label">Our Story</p>
+        <h2 class="section-title" id="aboutHeading">About Viona Bangles</h2>
+        <div class="gold-rule" aria-hidden="true"></div>
+        <p class="about-paragraph" id="aboutText">
+          Viona Bangles is a small family workshop in Gaya, Bihar. Every bangle is
+          finished by hand and checked before it is packed for you.
+        </p>
+        <ul class="about-points" id="aboutPoints"></ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       FAQ
+       ======================================================================== -->
   <section class="faq" id="faq">
     <div class="container">
-      <h2 class="section-title">Frequently Asked Questions</h2>
-      <div class="faq__list" id="faq-list">
-        <!-- filled by js/script.js -->
-      </div>
+      <header class="section-head">
+        <p class="section-label">Help</p>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+        <div class="gold-rule" aria-hidden="true"></div>
+      </header>
+      <div class="faq-list" id="faqList"></div>
     </div>
   </section>
 
-  <!-- ----------------------------- CONTACT ------------------------------ -->
+  <!-- ========================================================================
+       CONTACT
+       ======================================================================== -->
   <section class="contact" id="contact">
-    <div class="container contact__inner">
-      <div class="contact__info">
-        <h2 class="section-title section-title--left">Visit or Message Us</h2>
-        <p class="contact__lead" id="contact-lead">
-          We reply fast on WhatsApp — send us your size and favourite design.
-        </p>
+    <div class="container">
+      <header class="section-head">
+        <p class="section-label">Get in touch</p>
+        <h2 class="section-title">Visit or Message Us</h2>
+        <div class="gold-rule" aria-hidden="true"></div>
+      </header>
 
-        <ul class="contact__list">
-          <li>
-            <span class="contact__ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 6-9 12-9 12S3 16 3 10a9 9 0 1 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            </span>
-            <div>
-              <span class="contact__label">City</span>
-              <span class="contact__value" id="contact-city">Gaya, Bihar</span>
-            </div>
-          </li>
-          <li>
-            <span class="contact__ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            </span>
-            <div>
-              <span class="contact__label">Opening hours</span>
-              <span class="contact__value" id="contact-hours">10:00 AM - 7:00 PM</span>
-            </div>
-          </li>
-          <li>
-            <span class="contact__ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-            </span>
-            <div>
-              <span class="contact__label">Email</span>
-              <a class="contact__value" id="contact-email" href="mailto:vionabangles@gmail.com">vionabangles@gmail.com</a>
-            </div>
-          </li>
-          <li>
-            <span class="contact__ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.7a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z"/></svg>
-            </span>
-            <div>
-              <span class="contact__label">Phone</span>
-              <a class="contact__value" id="contact-phone" href="tel:+916200920746">+91 62009 20746</a>
-            </div>
-          </li>
-        </ul>
-      </div>
+      <div class="contact-grid">
 
-      <div class="contact__card">
-        <h3 class="contact__card-title">Order in a minute</h3>
-        <p class="contact__card-text">
-          Tap the button, tell us the design and your size — we will confirm
-          the price and delivery right away.
-        </p>
-        <a href="#" class="btn btn--gold btn--block" id="contact-whatsapp" target="_blank" rel="noopener">Message on WhatsApp</a>
-        <a href="#" class="btn btn--outline btn--block" id="contact-email-btn">Send an email</a>
+        <div class="contact-card">
+          <h3 class="contact-brand">Viona Bangles</h3>
+          <ul class="contact-list">
+            <li>
+              <span class="contact-label">Workshop</span>
+              <span id="contactCity">Gaya, Bihar</span>
+            </li>
+            <li>
+              <span class="contact-label">Open Hours</span>
+              <span id="contactHours">10:00 AM - 7:00 PM</span>
+            </li>
+            <li>
+              <span class="contact-label">Email</span>
+              <a id="contactEmail" href="mailto:vionabangles@gmail.com">vionabangles@gmail.com</a>
+            </li>
+            <li>
+              <span class="contact-label">WhatsApp</span>
+              <a id="contactPhone" href="#" target="_blank" rel="noopener">+91 62009 20746</a>
+            </li>
+          </ul>
+          <a class="btn btn-gold btn-block" id="contactWhatsApp"
+             href="#" target="_blank" rel="noopener">Chat on WhatsApp</a>
+        </div>
+
+        <div class="contact-panel">
+          <p class="contact-panel-label">Ordering is simple</p>
+          <ol class="contact-steps">
+            <li>Open any bangle and choose your size.</li>
+            <li>Tap <strong>Order on WhatsApp</strong>.</li>
+            <li>Send the product code and your address.</li>
+            <li>We confirm the order on WhatsApp.</li>
+          </ol>
+          <div class="contact-social" id="contactSocial"></div>
+        </div>
+
       </div>
     </div>
   </section>
 
 </main>
 
-<!-- ======================================================================
+<!-- ==========================================================================
      FOOTER
-     ====================================================================== -->
+     ========================================================================== -->
 <footer class="site-footer">
-  <div class="container footer__inner">
-    <div class="footer__brand">
-      <span class="wordmark wordmark--gold footer__mark">
-        <svg class="wordmark__v" viewBox="0 0 115 96" aria-hidden="true"><use href="#v-leaf"></use></svg>
-        <span class="wordmark__text">iona</span>
-      </span>
-      <p class="footer__tagline">ELEGANT BANGLES</p>
-      <p class="footer__tagline footer__tagline--italic">Made for You</p>
+  <div class="container footer-inner">
+
+    <div class="footer-brand">
+      <img src="images/logo-gold.png"
+           alt="Viona Bangles"
+           class="wordmark-img footer-logo"
+           id="footerLogo"
+           onerror="this.style.display='none';var f=document.getElementById('footerLogoFallback');if(f){f.hidden=false;}" />
+      <span class="brand-fallback" id="footerLogoFallback" hidden>Viona</span>
+      <p class="footer-tagline">ELEGANT BANGLES</p>
+      <p class="footer-sub">Made for You</p>
     </div>
 
-    <div class="footer__cols">
-      <div class="footer__col">
-        <h4 class="footer__head">Shop</h4>
-        <a href="#collections" class="footer__link">All bangles</a>
-        <a href="#about" class="footer__link">About us</a>
-        <a href="#faq" class="footer__link">FAQ</a>
-      </div>
-      <div class="footer__col">
-        <h4 class="footer__head">Reach us</h4>
-        <a href="#" class="footer__link" id="footer-whatsapp" target="_blank" rel="noopener">WhatsApp</a>
-        <a href="mailto:vionabangles@gmail.com" class="footer__link" id="footer-email">vionabangles@gmail.com</a>
-        <span class="footer__link" id="footer-city">Gaya, Bihar</span>
-      </div>
-      <div class="footer__col">
-        <h4 class="footer__head">Help</h4>
-        <a href="#contact" class="footer__link">Delivery</a>
-        <a href="#contact" class="footer__link">Payment</a>
-        <a href="#contact" class="footer__link">Returns</a>
-      </div>
+    <div class="footer-col">
+      <h4 class="footer-heading">Explore</h4>
+      <a href="#collections" class="footer-link">Collections</a>
+      <a href="#about" class="footer-link">About Us</a>
+      <a href="#faq" class="footer-link">FAQ</a>
+      <a href="#contact" class="footer-link">Contact</a>
     </div>
+
+    <div class="footer-col">
+      <h4 class="footer-heading">Reach Us</h4>
+      <p class="footer-line" id="footerCity">Gaya, Bihar</p>
+      <p class="footer-line" id="footerHours">10:00 AM - 7:00 PM</p>
+      <a class="footer-link" id="footerEmail" href="mailto:vionabangles@gmail.com">vionabangles@gmail.com</a>
+      <a class="footer-link" id="footerWhatsApp" href="#" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+
+    <div class="footer-col">
+      <h4 class="footer-heading">Admin</h4>
+      <a class="footer-link" href="admin.html">Site Manager</a>
+    </div>
+
   </div>
 
-  <div class="footer__bottom">
-    <p>© <span id="footer-year">2025</span> Viona Bangles. All rights reserved.</p>
+  <div class="footer-bottom">
+    <div class="container">
+      <p>© <span id="footerYear">2026</span> Viona Bangles. All rights reserved.</p>
+    </div>
   </div>
 </footer>
 
-<!-- ======================================================================
-     POPUP ROOT — js/script.js injects a popup here if one is active.
-     ====================================================================== -->
-<div id="popup-root" class="popup-root"></div>
-
-<!-- ======================================================================
+<!-- ==========================================================================
      PRODUCT MODAL
-     ====================================================================== -->
-<div class="modal" id="product-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-  <div class="modal__backdrop" data-close-modal></div>
+     ========================================================================== -->
+<div class="modal" id="productModal" hidden>
+  <div class="modal-backdrop" data-close-modal></div>
 
-  <div class="modal__panel" role="document">
-    <button class="modal__close" type="button" data-close-modal aria-label="Close">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-        <line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line>
-      </svg>
+  <div class="modal-panel" role="dialog" aria-modal="true"
+       aria-labelledby="modalTitle" id="modalPanel">
+
+    <button class="modal-close" id="modalClose" type="button" aria-label="Close product">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"></line>
+        <line x1="18" y1="6" x2="6" y2="18"></line></svg>
     </button>
 
-    <div class="modal__grid">
-      <!-- Gallery -->
-      <div class="modal__gallery">
-        <div class="modal__main-img">
-          <img id="modal-main-img" src="" alt="" />
+    <div class="modal-body">
+
+      <!-- ---------- LEFT: IMAGE GALLERY ---------- -->
+      <div class="modal-gallery">
+        <div class="gallery-main">
+          <img id="galleryMainImg" src="" alt="" />
+          <div class="gallery-placeholder" id="galleryPlaceholder" hidden>Viona</div>
+          <span class="gallery-badge" id="galleryBadge" hidden></span>
         </div>
-        <div class="modal__thumbs" id="modal-thumbs"></div>
+        <div class="gallery-thumbs" id="galleryThumbs"></div>
       </div>
 
-      <!-- Info -->
-      <div class="modal__info">
-        <span class="modal__code" id="modal-code">VB-001</span>
-        <h3 class="modal__title" id="modal-title">Product name</h3>
+      <!-- ---------- RIGHT: INFO + TABS ---------- -->
+      <div class="modal-info">
 
-        <div class="modal__rating" id="modal-rating" hidden></div>
+        <p class="modal-code" id="modalCode"></p>
+        <h3 class="modal-title" id="modalTitle"></h3>
 
-        <div class="modal__price" id="modal-price"></div>
+        <!-- Average stars, only when at least 1 approved review exists -->
+        <button class="modal-rating" id="modalRating" type="button" hidden>
+          <span class="stars" id="modalStars" aria-hidden="true"></span>
+          <span class="modal-rating-text" id="modalRatingText"></span>
+        </button>
 
-        <p class="modal__desc" id="modal-desc"></p>
+        <div class="modal-price" id="modalPrice"></div>
 
-        <div class="modal__sizes" id="modal-sizes-wrap">
-          <span class="modal__label">Select size</span>
-          <div class="size-chips" id="modal-sizes"></div>
+        <p class="modal-desc" id="modalDesc"></p>
+
+        <div class="modal-sizes" id="modalSizesWrap">
+          <p class="field-label">Select size</p>
+          <div class="size-chips" id="modalSizes" role="radiogroup"
+               aria-label="Bangle size"></div>
         </div>
 
-        <a href="#" class="btn btn--gold btn--block modal__order" id="modal-order" target="_blank" rel="noopener">
-          Order on WhatsApp
-        </a>
-        <p class="modal__note">We confirm price, size and delivery on WhatsApp.</p>
-      </div>
-    </div>
+        <div class="modal-actions">
+          <a href="#" id="modalWhatsApp" class="btn btn-whatsapp"
+             target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="btn-wa-icon">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+            </svg>
+            Order on WhatsApp
+          </a>
+        </div>
 
-    <!-- Tabs: Details / Reviews -->
-    <div class="modal__tabs" role="tablist">
-      <button class="tab is-active" type="button" role="tab" data-tab="reviews" aria-selected="true" aria-controls="tab-reviews" id="tab-btn-reviews">Reviews</button>
-      <button class="tab" type="button" role="tab" data-tab="details" aria-selected="false" aria-controls="tab-details" id="tab-btn-details">Details</button>
-    </div>
+        <!-- Tabs -->
+        <div class="modal-tabs" role="tablist" aria-label="Product information">
+          <button class="tab-btn is-active" id="tabBtnDetails" type="button"
+                  role="tab" aria-selected="true" aria-controls="tabDetails"
+                  data-tab="details">Details</button>
+          <button class="tab-btn" id="tabBtnReviews" type="button"
+                  role="tab" aria-selected="false" aria-controls="tabReviews"
+                  data-tab="reviews">Reviews <span class="tab-count" id="tabReviewCount"></span></button>
+        </div>
 
-    <!-- Details panel -->
-    <div class="modal__tabpanel" id="tab-details" role="tabpanel" aria-labelledby="tab-btn-details" hidden>
-      <ul class="detail-list">
-        <li><span class="detail-list__k">Delivery</span><span class="detail-list__v" id="detail-delivery">Dispatch within 1 working day.</span></li>
-        <li><span class="detail-list__k">Payment</span><span class="detail-list__v" id="detail-payment">UPI, bank transfer or cash on delivery.</span></li>
-        <li><span class="detail-list__k">Returns</span><span class="detail-list__v" id="detail-returns">Damaged in transit? Tell us within 48 hours.</span></li>
-      </ul>
-    </div>
+        <!-- Tab: details -->
+        <div class="tab-panel" id="tabDetails" role="tabpanel"
+             aria-labelledby="tabBtnDetails">
+          <div class="detail-rows" id="detailRows"></div>
+        </div>
 
-    <!-- Reviews panel -->
-    <div class="modal__tabpanel" id="tab-reviews" role="tabpanel" aria-labelledby="tab-btn-reviews">
+        <!-- Tab: reviews -->
+        <div class="tab-panel" id="tabReviews" role="tabpanel"
+             aria-labelledby="tabBtnReviews" hidden>
 
-      <!-- Signed-in chip (avatar + name + sign out) -->
-      <div class="user-chip" id="user-chip" hidden>
-        <img class="user-chip__avatar" id="user-chip-avatar" src="" alt="" />
-        <span class="user-chip__name" id="user-chip-name"></span>
-        <button class="user-chip__out" type="button" id="user-chip-out">Sign out</button>
-      </div>
+          <!-- Signed-in chip -->
+          <div class="user-chip" id="userChip" hidden>
+            <img class="user-chip-avatar" id="userChipAvatar" src="" alt="" />
+            <span class="user-chip-letter" id="userChipLetter" hidden></span>
+            <span class="user-chip-name" id="userChipName"></span>
+            <button class="user-chip-out" id="userChipSignOut" type="button">Sign out</button>
+          </div>
 
-      <!-- Rating summary (average, total, 5 bars) -->
-      <div class="rev-summary" id="reviews-summary" hidden></div>
+          <!-- Summary block -->
+          <div class="reviews-summary" id="reviewsSummary">
+            <div class="reviews-summary-left">
+              <p class="reviews-average" id="reviewsAverage">0.0</p>
+              <p class="reviews-average-label">out of 5</p>
+              <span class="stars stars-lg" id="reviewsAverageStars" aria-hidden="true"></span>
+              <p class="reviews-total" id="reviewsTotal">0 reviews</p>
+            </div>
+            <div class="reviews-bars" id="reviewsBars"></div>
+          </div>
 
-      <!-- Toolbar: sort -->
-      <div class="rev-toolbar" id="reviews-toolbar" hidden>
-        <label class="rev-toolbar__label" for="reviews-sort">Sort by</label>
-        <select class="rev-toolbar__select" id="reviews-sort">
-          <option value="newest">Newest</option>
-          <option value="highest">Highest rating</option>
-          <option value="lowest">Lowest rating</option>
-        </select>
-      </div>
+          <!-- Toolbar -->
+          <div class="reviews-toolbar" id="reviewsToolbar" hidden>
+            <label class="sort-label" for="reviewSort">Sort by</label>
+            <select id="reviewSort" class="sort-select">
+              <option value="newest">Newest</option>
+              <option value="highest">Highest rating</option>
+              <option value="lowest">Lowest rating</option>
+            </select>
+          </div>
 
-      <!-- Write-a-review area (form / sign-in / existing review) -->
-      <div class="rev-write" id="reviews-write"></div>
+          <!-- Review list -->
+          <div class="reviews-list" id="reviewsList"></div>
+          <p class="reviews-empty" id="reviewsEmpty" hidden>
+            No reviews yet. Be the first to share your thoughts.
+          </p>
 
-      <!-- The list of review cards -->
-      <div class="rev-list" id="reviews-list"></div>
+          <!-- Write / edit review area -->
+          <div class="review-form-wrap" id="reviewFormWrap"></div>
 
-      <!-- Shown while reviews are loading -->
-      <div class="rev-loading" id="reviews-loading" hidden>
-        <span class="spinner" aria-hidden="true"></span> Loading reviews…
+        </div>
+
       </div>
     </div>
   </div>
 </div>
 
-<!-- ======================================================================
-     IMAGE LIGHTBOX for review photos
-     ====================================================================== -->
-<div class="lightbox" id="lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Photo viewer">
-  <button class="lightbox__close" type="button" id="lightbox-close" aria-label="Close photo">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-      <line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line>
-    </svg>
+<!-- ==========================================================================
+     LIGHTBOX (review photo viewer)
+     ========================================================================== -->
+<div class="lightbox" id="lightbox" hidden>
+  <div class="lightbox-backdrop" data-lb-close></div>
+  <button class="lightbox-close" id="lbClose" type="button" aria-label="Close viewer">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"></line>
+      <line x1="18" y1="6" x2="6" y2="18"></line></svg>
   </button>
-  <button class="lightbox__nav lightbox__nav--prev" type="button" id="lightbox-prev" aria-label="Previous photo">&#8249;</button>
-  <img class="lightbox__img" id="lightbox-img" src="" alt="" />
-  <button class="lightbox__nav lightbox__nav--next" type="button" id="lightbox-next" aria-label="Next photo">&#8250;</button>
+  <button class="lightbox-arrow prev" id="lbPrev" type="button" aria-label="Previous photo">&#8249;</button>
+  <img class="lightbox-img" id="lbImg" src="" alt="Review photo" />
+  <button class="lightbox-arrow next" id="lbNext" type="button" aria-label="Next photo">&#8250;</button>
+  <p class="lightbox-counter" id="lbCounter"></p>
 </div>
 
-<!-- ======================================================================
-     TOASTS
-     ====================================================================== -->
-<div class="toast-root" id="toast-root" aria-live="polite" aria-atomic="true"></div>
+<!-- ==========================================================================
+     POPUP MESSAGE ROOT (filled by JS only when an active popup exists)
+     ========================================================================== -->
+<div id="popupRoot" class="popup-root"></div>
 
-<!-- ======================================================================
+<!-- ==========================================================================
+     TOAST
+     ========================================================================== -->
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- ==========================================================================
      SCRIPTS
-     Supabase JS v2 from CDN, then our config, then our app code.
-     ====================================================================== -->
+     ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/script.js"></script>
+
 </body>
 </html>
