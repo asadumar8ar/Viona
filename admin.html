@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Viona Bangles — Site Manager</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#14224A" />
+<link rel="icon" type="image/png" href="images/favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+
+<!-- =========================================================================
+     LOGIN SCREEN (shown only when not signed in)
+     ========================================================================= -->
+<div class="login-screen" id="loginScreen" hidden>
+  <div class="login-card">
+    <div class="login-brand">
+      <img src="images/logo-gold.png"
+           alt="Viona Bangles"
+           class="wordmark-img login-logo"
+           onerror="this.style.display='none';var f=document.getElementById('loginLogoFallback');if(f){f.hidden=false;}" />
+      <span class="brand-fallback" id="loginLogoFallback" hidden>Viona</span>
+      <p class="login-brand-sub">ELEGANT BANGLES</p>
+      <p class="login-brand-italic">Made for You</p>
+    </div>
+
+    <h1 class="login-title">Site Manager</h1>
+    <p class="login-text">
+      Sign in with the Google account listed as an admin for this store.
+    </p>
+
+    <button type="button" class="btn btn-gold btn-block" id="loginGoogleBtn">
+      <svg viewBox="0 0 48 48" aria-hidden="true" class="google-icon">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.3 26.7 36 24 36c-5.2 0-9.6-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.2C36.9 40.3 44 35 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+      </svg>
+      Sign in with Google
+    </button>
+
+    <p class="login-note" id="loginNote" hidden></p>
+    <p class="login-foot">Protected by Supabase Row Level Security.</p>
+  </div>
+</div>
+
+<!-- =========================================================================
+     NO ACCESS SCREEN
+     ========================================================================= -->
+<div class="login-screen" id="deniedScreen" hidden>
+  <div class="login-card">
+    <h1 class="login-title">You do not have access</h1>
+    <p class="login-text">
+      This Google account is not an admin for Viona Bangles.
+    </p>
+    <p class="login-text" id="deniedEmail"></p>
+    <button type="button" class="btn btn-gold btn-block" id="deniedSignOut">Sign out</button>
+  </div>
+</div>
+
+<!-- =========================================================================
+     MAIN APP
+     ========================================================================= -->
+<div class="app" id="app" hidden>
+
+  <!-- ---------- SIDEBAR (desktop) / TOP BAR (mobile) ---------- -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="images/logo-gold.png"
+           alt="Viona Bangles"
+           class="wordmark-img sidebar-logo"
+           onerror="this.style.display='none';var f=document.getElementById('sidebarLogoFallback');if(f){f.hidden=false;}" />
+      <span class="brand-fallback" id="sidebarLogoFallback" hidden>Viona</span>
+      <p class="sidebar-tag">Site Manager</p>
+    </div>
+
+    <nav class="sidebar-nav" id="sidebarNav">
+      <button type="button" class="tab-btn is-active" data-tab="products">Products</button>
+      <button type="button" class="tab-btn" data-tab="offers">Offers</button>
+      <button type="button" class="tab-btn" data-tab="reviews">Reviews</button>
+      <button type="button" class="tab-btn" data-tab="settings">Site Settings</button>
+      <button type="button" class="tab-btn" data-tab="faq">FAQ</button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <a class="sidebar-link" href="index.html" target="_blank" rel="noopener">View Site ↗</a>
+      <button type="button" class="sidebar-signout" id="signOutBtn">Sign out</button>
+    </div>
+  </aside>
+
+  <!-- ---------- MAIN CONTENT ---------- -->
+  <main class="main">
+
+    <!-- Top bar (mobile) -->
+    <div class="mobile-bar" id="mobileBar">
+      <div class="mobile-brand">
+        <img src="images/logo-gold.png" alt="Viona Bangles" class="wordmark-img mobile-logo"
+             onerror="this.style.display='none';var f=document.getElementById('mobileLogoFallback');if(f){f.hidden=false;}" />
+        <span class="brand-fallback" id="mobileLogoFallback" hidden>Viona</span>
+      </div>
+      <button type="button" class="mobile-signout" id="mobileSignOut">Sign out</button>
+    </div>
+
+    <div class="mobile-tabs" id="mobileTabs">
+      <button type="button" class="tab-btn is-active" data-tab="products">Products</button>
+      <button type="button" class="tab-btn" data-tab="offers">Offers</button>
+      <button type="button" class="tab-btn" data-tab="reviews">Reviews</button>
+      <button type="button" class="tab-btn" data-tab="settings">Settings</button>
+      <button type="button" class="tab-btn" data-tab="faq">FAQ</button>
+    </div>
+
+    <!-- Who is signed in -->
+    <div class="who-bar">
+      <span class="who-label">Signed in as</span>
+      <span class="who-name" id="whoName">—</span>
+    </div>
+
+    <!-- ===================================================================
+         TAB: PRODUCTS
+         =================================================================== -->
+    <section class="tab-panel is-active" id="panel-products">
+      <header class="panel-head">
+        <div>
+          <h2 class="panel-title">Products</h2>
+          <p class="panel-sub">Add, edit and organize the bangles shown on the website.</p>
+        </div>
+        <button type="button" class="btn btn-gold" id="newProductBtn">+ New Product</button>
+      </header>
+
+      <div class="list-block" id="productsList">
+        <p class="loading-line">Loading products…</p>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         TAB: OFFERS
+         =================================================================== -->
+    <section class="tab-panel" id="panel-offers">
+      <header class="panel-head">
+        <div>
+          <h2 class="panel-title">Offers</h2>
+          <p class="panel-sub">Announcement strips, banners and popups. Leave empty to hide them completely.</p>
+        </div>
+        <button type="button" class="btn btn-gold" id="newOfferBtn">+ New Message</button>
+      </header>
+
+      <div class="list-block" id="offersList">
+        <p class="loading-line">Loading messages…</p>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         TAB: REVIEWS
+         =================================================================== -->
+    <section class="tab-panel" id="panel-reviews">
+      <header class="panel-head">
+        <div>
+          <h2 class="panel-title">Reviews</h2>
+          <p class="panel-sub">New reviews are pending until you approve them.</p>
+        </div>
+        <div class="filter-row">
+          <button type="button" class="filter-btn is-active" data-filter="pending">Pending</button>
+          <button type="button" class="filter-btn" data-filter="approved">Approved</button>
+          <button type="button" class="filter-btn" data-filter="all">All</button>
+        </div>
+      </header>
+
+      <div class="list-block" id="reviewsList">
+        <p class="loading-line">Loading reviews…</p>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         TAB: SITE SETTINGS
+         =================================================================== -->
+    <section class="tab-panel" id="panel-settings">
+      <header class="panel-head">
+        <div>
+          <h2 class="panel-title">Site Settings</h2>
+          <p class="panel-sub">These values feed the public website. Empty fields fall back to config.js.</p>
+        </div>
+        <button type="button" class="btn btn-gold" id="saveSettingsBtn">Save Settings</button>
+      </header>
+
+      <form class="card" id="settingsForm" onsubmit="return false;">
+
+        <h3 class="card-title">Business</h3>
+        <div class="grid-2">
+          <label class="field">
+            <span>Business Name</span>
+            <input type="text" id="setBusinessName" class="input" />
+          </label>
+          <label class="field">
+            <span>WhatsApp Number (with country code, no +)</span>
+            <input type="text" id="setWhatsapp" class="input" placeholder="916200920746" />
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <input type="email" id="setEmail" class="input" />
+          </label>
+          <label class="field">
+            <span>Phone (optional)</span>
+            <input type="text" id="setPhone" class="input" />
+          </label>
+          <label class="field">
+            <span>City</span>
+            <input type="text" id="setCity" class="input" />
+          </label>
+          <label class="field">
+            <span>Open Hours</span>
+            <input type="text" id="setHours" class="input" />
+          </label>
+        </div>
+
+        <h3 class="card-title">Hero</h3>
+        <div class="grid-2">
+          <label class="field">
+            <span>Small label above the heading</span>
+            <input type="text" id="setHeroLabel" class="input" />
+          </label>
+          <label class="field">
+            <span>Big heading</span>
+            <input type="text" id="setHeroHeading" class="input" />
+          </label>
+        </div>
+        <label class="field">
+          <span>Hero paragraph</span>
+          <textarea id="setHeroText" class="textarea"></textarea>
+        </label>
+
+        <h3 class="card-title">About</h3>
+        <label class="field">
+          <span>About heading</span>
+          <input type="text" id="setAboutHeading" class="input" />
+        </label>
+        <label class="field">
+          <span>About paragraph</span>
+          <textarea id="setAboutText" class="textarea"></textarea>
+        </label>
+
+        <h3 class="card-title">Policies</h3>
+        <label class="field">
+          <span>Delivery text</span>
+          <textarea id="setDelivery" class="textarea"></textarea>
+        </label>
+        <label class="field">
+          <span>Payment text</span>
+          <textarea id="setPayment" class="textarea"></textarea>
+        </label>
+        <label class="field">
+          <span>Return text</span>
+          <textarea id="setReturns" class="textarea"></textarea>
+        </label>
+
+        <h3 class="card-title">Trust Points (up to 3)</h3>
+        <div class="grid-3">
+          <label class="field">
+            <span>Point 1</span>
+            <input type="text" id="setTrust1" class="input" />
+          </label>
+          <label class="field">
+            <span>Point 2</span>
+            <input type="text" id="setTrust2" class="input" />
+          </label>
+          <label class="field">
+            <span>Point 3</span>
+            <input type="text" id="setTrust3" class="input" />
+          </label>
+        </div>
+
+        <h3 class="card-title">Social Links (optional)</h3>
+        <div class="grid-3">
+          <label class="field">
+            <span>Instagram URL</span>
+            <input type="url" id="setInstagram" class="input" placeholder="https://instagram.com/…" />
+          </label>
+          <label class="field">
+            <span>Facebook URL</span>
+            <input type="url" id="setFacebook" class="input" placeholder="https://facebook.com/…" />
+          </label>
+          <label class="field">
+            <span>YouTube URL</span>
+            <input type="url" id="setYoutube" class="input" placeholder="https://youtube.com/…" />
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-gold" id="saveSettingsBtn2">Save Settings</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===================================================================
+         TAB: FAQ
+         =================================================================== -->
+    <section class="tab-panel" id="panel-faq">
+      <header class="panel-head">
+        <div>
+          <h2 class="panel-title">FAQ</h2>
+          <p class="panel-sub">Questions shown on the website. Drag the arrows to reorder.</p>
+        </div>
+        <button type="button" class="btn btn-gold" id="newFaqBtn">+ New Question</button>
+      </header>
+
+      <div class="list-block" id="faqList">
+        <p class="loading-line">Loading FAQs…</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- =========================================================================
+     MODAL: PRODUCT EDIT
+     ========================================================================= -->
+<div class="modal" id="productModal" hidden>
+  <div class="modal-backdrop" data-close="productModal"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+    <button type="button" class="modal-close" data-close="productModal" aria-label="Close">×</button>
+
+    <h2 class="modal-title" id="productModalTitle">Edit Product</h2>
+    <p class="modal-sub" id="productModalSub">Fill in the details below.</p>
+
+    <form class="modal-form" id="productForm" onsubmit="return false;">
+      <input type="hidden" id="pEditId" value="" />
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Name *</span>
+          <input type="text" id="pName" class="input" required />
+        </label>
+        <label class="field">
+          <span>Category *</span>
+          <input type="text" id="pCategory" class="input" list="catList" required />
+          <datalist id="catList"></datalist>
+          <small class="hint">Pick an existing one or type a new category.</small>
+        </label>
+        <label class="field">
+          <span>Price (Rs) *</span>
+          <input type="number" id="pPrice" class="input" min="0" step="1" required />
+        </label>
+        <label class="field">
+          <span>Old Price (optional)</span>
+          <input type="number" id="pOldPrice" class="input" min="0" step="1" />
+          <small class="hint">Set this higher than Price to show an X% OFF badge.</small>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Available Sizes</span>
+        <div class="chips-edit" id="pSizesChips"></div>
+        <div class="chip-add">
+          <input type="text" id="pNewSize" class="input" placeholder="e.g. 2.10" />
+          <button type="button" class="btn btn-ghost" id="pAddSizeBtn">Add size</button>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Description</span>
+        <textarea id="pDescription" class="textarea" rows="4"></textarea>
+      </label>
+
+      <div class="grid-3">
+        <label class="switch">
+          <input type="checkbox" id="pIsActive" checked />
+          <span>Active (visible on site)</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="pIsFeatured" />
+          <span>Featured</span>
+        </label>
+        <label class="field">
+          <span>Sort order</span>
+          <input type="number" id="pSortOrder" class="input" step="1" value="0" />
+        </label>
+      </div>
+
+      <h3 class="card-title">Images</h3>
+      <p class="hint">The first image is the main image. Up to 8 extra images.</p>
+
+      <div class="images-edit" id="pImages"></div>
+
+      <input type="file" id="pImageInput" accept="image/*" multiple hidden />
+      <button type="button" class="btn btn-ghost" id="pAddImageBtn">+ Add Images</button>
+
+      <p class="form-error" id="productFormError" hidden></p>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-close="productModal">Cancel</button>
+        <button type="button" class="btn btn-gold" id="saveProductBtn">Save Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =========================================================================
+     MODAL: OFFER EDIT
+     ========================================================================= -->
+<div class="modal" id="offerModal" hidden>
+  <div class="modal-backdrop" data-close="offerModal"></div>
+  <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" aria-labelledby="offerModalTitle">
+    <button type="button" class="modal-close" data-close="offerModal" aria-label="Close">×</button>
+
+    <h2 class="modal-title" id="offerModalTitle">Edit Message</h2>
+    <p class="modal-sub">Pick a display type and write any message you like.</p>
+
+    <form class="modal-form" id="offerForm" onsubmit="return false;">
+      <input type="hidden" id="oEditId" value="" />
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Display Type *</span>
+          <select id="oDisplayType" class="input">
+            <option value="strip">Strip (thin bar on top)</option>
+            <option value="banner">Banner (large carousel)</option>
+            <option value="popup">Popup (centre modal)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Text align</span>
+          <select id="oTextAlign" class="input">
+            <option value="center">Center</option>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Title / Main text</span>
+        <input type="text" id="oTitle" class="input" />
+      </label>
+
+      <label class="field">
+        <span>Subtitle (italic, optional)</span>
+        <input type="text" id="oSubtitle" class="input" />
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Button text (optional)</span>
+          <input type="text" id="oButtonText" class="input" placeholder="SHOP NOW" />
+        </label>
+        <label class="field">
+          <span>Button link (optional)</span>
+          <input type="text" id="oButtonLink" class="input" placeholder="#collections" />
+        </label>
+      </div>
+
+      <h3 class="card-title">Background</h3>
+      <p class="hint">Upload an image OR set colours. Image wins if both are set.</p>
+
+      <div class="offer-bg-image" id="oBgImageWrap"></div>
+      <input type="file" id="oBgInput" accept="image/*" hidden />
+      <button type="button" class="btn btn-ghost" id="oBgBtn">Choose background image</button>
+
+      <div class="grid-3">
+        <label class="field">
+          <span>Background colour</span>
+          <input type="color" id="oBgColor" class="input input-color" value="#14224A" />
+        </label>
+        <label class="field">
+          <span>Second colour (for gradient)</span>
+          <input type="color" id="oBgColor2" class="input input-color" value="#1D2E5C" />
+        </label>
+        <label class="field">
+          <span>Text colour</span>
+          <input type="color" id="oTextColor" class="input input-color" value="#FFFFFF" />
+        </label>
+      </div>
+
+      <div class="grid-3">
+        <label class="field">
+          <span>Button background</span>
+          <input type="color" id="oButtonBg" class="input input-color" value="#C9A24A" />
+        </label>
+        <label class="field">
+          <span>Button text colour</span>
+          <input type="color" id="oButtonTextColor" class="input input-color" value="#14224A" />
+        </label>
+        <label class="field">
+          <span>Sort order</span>
+          <input type="number" id="oSortOrder" class="input" step="1" value="0" />
+        </label>
+      </div>
+
+      <h3 class="card-title">Schedule</h3>
+      <div class="grid-3">
+        <label class="field">
+          <span>Start (optional)</span>
+          <input type="datetime-local" id="oStartsAt" class="input" />
+        </label>
+        <label class="field">
+          <span>End (optional)</span>
+          <input type="datetime-local" id="oEndsAt" class="input" />
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="oIsActive" checked />
+          <span>Active</span>
+        </label>
+      </div>
+
+      <h3 class="card-title">Live Preview</h3>
+      <div class="offer-preview" id="oPreview"></div>
+
+      <p class="form-error" id="offerFormError" hidden></p>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-close="offerModal">Cancel</button>
+        <button type="button" class="btn btn-gold" id="saveOfferBtn">Save Message</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =========================================================================
+     MODAL: FAQ EDIT
+     ========================================================================= -->
+<div class="modal" id="faqModal" hidden>
+  <div class="modal-backdrop" data-close="faqModal"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="faqModalTitle">
+    <button type="button" class="modal-close" data-close="faqModal" aria-label="Close">×</button>
+
+    <h2 class="modal-title" id="faqModalTitle">Edit Question</h2>
+
+    <form class="modal-form" id="faqForm" onsubmit="return false;">
+      <input type="hidden" id="fEditId" value="" />
+
+      <label class="field">
+        <span>Question *</span>
+        <input type="text" id="fQuestion" class="input" required />
+      </label>
+
+      <label class="field">
+        <span>Answer *</span>
+        <textarea id="fAnswer" class="textarea" rows="5" required></textarea>
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Sort order</span>
+          <input type="number" id="fSortOrder" class="input" step="1" value="0" />
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="fIsActive" checked />
+          <span>Visible on site</span>
+        </label>
+      </div>
+
+      <p class="form-error" id="faqFormError" hidden></p>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-close="faqModal">Cancel</button>
+        <button type="button" class="btn btn-gold" id="saveFaqBtn">Save Question</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =========================================================================
+     CONFIRM DIALOG
+     ========================================================================= -->
+<div class="modal modal-small" id="confirmModal" hidden>
+  <div class="modal-backdrop" data-close="confirmModal"></div>
+  <div class="modal-panel" role="alertdialog" aria-modal="true">
+    <h2 class="modal-title" id="confirmTitle">Are you sure?</h2>
+    <p class="modal-sub" id="confirmText">This cannot be undone.</p>
+    <div class="form-actions">
+      <button type="button" class="btn btn-ghost" id="confirmNo">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirmYes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- Global loading overlay -->
+<div class="busy" id="busy" hidden>
+  <div class="busy-spinner" aria-hidden="true"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/admin.js"></script>
+
+</body>
+</html>
