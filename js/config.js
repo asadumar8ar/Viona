@@ -6,7 +6,7 @@
 
    IMPORTANT:
    - SUPABASE_URL must start with "https://" and end with ".supabase.co"
-   - Use the "anon / public" key ONLY.
+   - Use the "sb_publishable_kQxMgjHaLLSl0n82pnFOXQ_FTXlSx2z" key ONLY.
      NEVER put the "service_role" key here. That key bypasses all security.
 
    If you leave the PASTE_... values in place, the website still works using
