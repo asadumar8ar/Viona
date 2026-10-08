@@ -17,23 +17,24 @@
 <body>
 
 <!-- ============================================================
-     LOGIN SCREEN
+     1. LOGIN SCREEN
      ============================================================ -->
-<div class="screen" id="loginScreen" hidden>
+<div class="screen" id="loginScreen">
   <div class="login-card">
     <div class="login-brand">
       <img src="images/logo-gold.png"
            alt="Viona Bangles"
            class="login-logo"
-           onerror="this.style.display='none';var f=document.getElementById('loginLogoFallback');if(f){f.hidden=false;}" />
-      <span class="brand-fallback" id="loginLogoFallback" hidden>Viona</span>
+           onerror="this.style.display='none';var f=document.getElementById('loginLogoFallback');if(f){f.style.display='block';}" />
+      <span class="brand-fallback" id="loginLogoFallback" style="display:none;">Viona</span>
       <p class="login-brand-sub">ELEGANT BANGLES</p>
     </div>
 
     <h1 class="login-title">Site Manager</h1>
-    <p class="login-text">Sign in to manage products, offers, reviews and site settings.</p>
+    <p class="login-text">Sign in to manage your products, offers and store settings.</p>
 
     <div class="config-warning" id="configWarning" hidden></div>
+    <div class="login-note" id="loginNote" hidden></div>
 
     <button type="button" class="btn btn-gold btn-block" id="loginGoogleBtn">
       <svg viewBox="0 0 48 48" aria-hidden="true" class="google-icon">
@@ -45,106 +46,79 @@
       <span>Sign in with Google</span>
     </button>
 
-    <p class="login-note" id="loginNote" hidden></p>
     <p class="login-foot">Only the store admin can sign in.</p>
   </div>
 </div>
 
 <!-- ============================================================
-     DENIED SCREEN
+     2. DASHBOARD
      ============================================================ -->
-<div class="screen" id="deniedScreen" hidden>
-  <div class="login-card">
-    <div class="login-brand">
+<div class="app hidden" id="app">
+
+  <!-- ---------- Top bar ---------- -->
+  <header class="topbar" id="topbar">
+    <div class="topbar-brand">
       <img src="images/logo-navy.png"
            alt="Viona Bangles"
-           class="login-logo"
-           onerror="this.style.display='none';var f=document.getElementById('deniedLogoFallback');if(f){f.hidden=false;}" />
-      <span class="brand-fallback brand-fallback-navy" id="deniedLogoFallback" hidden>Viona</span>
+           class="topbar-logo"
+           onerror="this.style.display='none';var f=document.getElementById('topLogoFallback');if(f){f.style.display='block';}" />
+      <span class="brand-fallback brand-fallback-navy" id="topLogoFallback" style="display:none;">Viona</span>
     </div>
 
-    <h1 class="login-title">Access denied</h1>
-    <p class="login-text">This Google account is not registered as an admin for Viona Bangles.</p>
-    <p class="login-text login-email" id="deniedEmail"></p>
-
-    <button type="button" class="btn btn-gold btn-block" id="deniedSignOut">Sign out</button>
-  </div>
-</div>
-
-<!-- ============================================================
-     MAIN APP
-     ============================================================ -->
-<div class="app" id="app" hidden>
-
-  <!-- Sidebar (desktop) -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand">
-      <img src="images/logo-gold.png"
-           alt="Viona Bangles"
-           class="sidebar-logo"
-           onerror="this.style.display='none';var f=document.getElementById('sidebarLogoFallback');if(f){f.hidden=false;}" />
-      <span class="brand-fallback" id="sidebarLogoFallback" hidden>Viona</span>
-      <p class="sidebar-tag">Site Manager</p>
+    <div class="topbar-right">
+      <span class="topbar-email" id="adminEmail">—</span>
+      <button type="button" class="btn btn-ghost btn-small" id="signOutBtn">Sign out</button>
     </div>
+  </header>
 
-    <nav class="sidebar-nav" id="sidebarNav">
-      <button type="button" class="tab-btn is-active" data-tab="products">Products</button>
-      <button type="button" class="tab-btn" data-tab="offers">Offers</button>
-      <button type="button" class="tab-btn" data-tab="reviews">Reviews</button>
-      <button type="button" class="tab-btn" data-tab="settings">Site Settings</button>
-      <button type="button" class="tab-btn" data-tab="faq">FAQ</button>
-    </nav>
+  <!-- ---------- Tabs ---------- -->
+  <nav class="tabs" id="tabs" role="tablist">
+    <button type="button" class="tab-btn is-active" data-tab="products" role="tab">Products</button>
+    <button type="button" class="tab-btn" data-tab="settings" role="tab">Offers &amp; Settings</button>
+  </nav>
 
-    <div class="sidebar-foot">
-      <a class="sidebar-link" href="index.html" target="_blank" rel="noopener">View site ↗</a>
-      <button type="button" class="sidebar-signout" id="signOutBtn">Sign out</button>
-    </div>
-  </aside>
-
-  <!-- Main content -->
   <main class="main">
 
-    <!-- Mobile top bar -->
-    <div class="mobile-bar" id="mobileBar">
-      <div class="mobile-brand">
-        <img src="images/logo-gold.png"
-             alt="Viona Bangles"
-             class="mobile-logo"
-             onerror="this.style.display='none';var f=document.getElementById('mobileLogoFallback');if(f){f.hidden=false;}" />
-        <span class="brand-fallback" id="mobileLogoFallback" hidden>Viona</span>
-      </div>
-      <button type="button" class="mobile-signout" id="mobileSignOut">Sign out</button>
-    </div>
-
-    <div class="mobile-tabs" id="mobileTabs">
-      <button type="button" class="tab-btn is-active" data-tab="products">Products</button>
-      <button type="button" class="tab-btn" data-tab="offers">Offers</button>
-      <button type="button" class="tab-btn" data-tab="reviews">Reviews</button>
-      <button type="button" class="tab-btn" data-tab="settings">Settings</button>
-      <button type="button" class="tab-btn" data-tab="faq">FAQ</button>
-    </div>
-
-    <!-- Signed-in bar -->
-    <div class="who-bar">
-      <span class="who-label">Signed in as</span>
-      <span class="who-name" id="whoName">—</span>
-    </div>
+    <!-- =========================================================
+         STAT CARDS
+         ========================================================= -->
+    <section class="stats" id="statsRow">
+      <article class="stat-card">
+        <span class="stat-label">Total products</span>
+        <span class="stat-value" id="statTotal">—</span>
+      </article>
+      <article class="stat-card stat-card-active">
+        <span class="stat-label">Active</span>
+        <span class="stat-value" id="statActive">—</span>
+      </article>
+      <article class="stat-card stat-card-hidden">
+        <span class="stat-label">Hidden</span>
+        <span class="stat-value" id="statHidden">—</span>
+      </article>
+    </section>
 
     <!-- =========================================================
-         TAB: PRODUCTS
+         TAB PANEL: PRODUCTS
          ========================================================= -->
-    <section class="tab-panel is-active" id="panel-products">
+    <section class="tab-panel is-active" id="panel-products" role="tabpanel">
+
       <header class="panel-head">
         <div class="panel-head-text">
           <h2 class="panel-title">Products</h2>
-          <p class="panel-sub">Add, edit and organize the bangles shown on the website.</p>
+          <p class="panel-sub">Add, edit and organise the bangles shown on the website.</p>
         </div>
         <button type="button" class="btn btn-gold" id="newProductBtn">+ New Product</button>
       </header>
 
-      <div class="toolbar">
-        <input type="search" id="productSearch" class="input" placeholder="Search by name or code…" />
-        <select id="productFilterCategory" class="input">
+      <div class="toolbar" id="productToolbar">
+        <input type="search"
+               id="productSearch"
+               class="input"
+               placeholder="Search by name or code…"
+               autocomplete="off"
+               aria-label="Search products" />
+
+        <select id="productFilterCategory" class="input" aria-label="Filter by category">
           <option value="">All categories</option>
           <option value="glass">Glass</option>
           <option value="metal">Metal</option>
@@ -153,11 +127,11 @@
           <option value="kundan">Kundan</option>
           <option value="kids">Kids</option>
         </select>
-        <select id="productFilterStatus" class="input">
-          <option value="">All stock</option>
-          <option value="in_stock">In stock</option>
-          <option value="out_of_stock">Out of stock</option>
-          <option value="made_to_order">Made to order</option>
+
+        <select id="productFilterStatus" class="input" aria-label="Filter by visibility">
+          <option value="">All statuses</option>
+          <option value="active">Active only</option>
+          <option value="hidden">Hidden only</option>
         </select>
       </div>
 
@@ -167,192 +141,121 @@
     </section>
 
     <!-- =========================================================
-         TAB: OFFERS
+         TAB PANEL: OFFERS & SETTINGS
          ========================================================= -->
-    <section class="tab-panel" id="panel-offers">
+    <section class="tab-panel hidden" id="panel-settings" role="tabpanel">
+
       <header class="panel-head">
         <div class="panel-head-text">
-          <h2 class="panel-title">Offers</h2>
-          <p class="panel-sub">Announcement strips, banners and popups. Leave empty to hide them.</p>
+          <h2 class="panel-title">Offers &amp; Settings</h2>
+          <p class="panel-sub">These values feed the public website. Leave a field empty to hide it.</p>
         </div>
-        <button type="button" class="btn btn-gold" id="newOfferBtn">+ New Message</button>
-      </header>
-
-      <div class="list-block" id="offersList">
-        <p class="loading-line">Loading messages…</p>
-      </div>
-    </section>
-
-    <!-- =========================================================
-         TAB: REVIEWS
-         ========================================================= -->
-    <section class="tab-panel" id="panel-reviews">
-      <header class="panel-head">
-        <div class="panel-head-text">
-          <h2 class="panel-title">Reviews</h2>
-          <p class="panel-sub">New reviews are pending until you approve them.</p>
-        </div>
-        <div class="filter-row">
-          <button type="button" class="filter-btn is-active" data-filter="pending">Pending</button>
-          <button type="button" class="filter-btn" data-filter="approved">Approved</button>
-          <button type="button" class="filter-btn" data-filter="all">All</button>
-        </div>
-      </header>
-
-      <div class="list-block" id="reviewsList">
-        <p class="loading-line">Loading reviews…</p>
-      </div>
-    </section>
-
-    <!-- =========================================================
-         TAB: SITE SETTINGS
-         ========================================================= -->
-    <section class="tab-panel" id="panel-settings">
-      <header class="panel-head">
-        <div class="panel-head-text">
-          <h2 class="panel-title">Site Settings</h2>
-          <p class="panel-sub">These values feed the public website. Empty fields fall back to config.js.</p>
-        </div>
-        <button type="button" class="btn btn-gold" id="saveSettingsBtn">Save Settings</button>
+        <button type="button" class="btn btn-gold" id="saveSettingsBtn">Save settings</button>
       </header>
 
       <form class="card" id="settingsForm" onsubmit="return false;">
 
-        <h3 class="card-title">Business</h3>
+        <!-- ---------- Offer banner ---------- -->
+        <h3 class="card-title">Offer banner</h3>
+
+        <label class="switch">
+          <input type="checkbox" id="setOfferActive" />
+          <span>Show offer banner on website</span>
+        </label>
+
+        <label class="field">
+          <span>Offer message <small class="hint-inline">(max 140 characters)</small></span>
+          <textarea id="setOfferText"
+                    class="textarea"
+                    rows="2"
+                    maxlength="140"
+                    placeholder="e.g. Festive sale — flat 20% off on all bridal bangles!"></textarea>
+          <small class="hint"><span id="offerTextCount">0</span> / 140 characters</small>
+        </label>
+
+        <div class="banner-preview-wrap">
+          <span class="preview-label">Live preview</span>
+          <div class="offer-banner" id="bannerPreview" hidden>
+            <span id="bannerPreviewText"></span>
+          </div>
+        </div>
+
+        <!-- ---------- Contact ---------- -->
+        <h3 class="card-title">Contact</h3>
         <div class="grid-2">
           <label class="field">
-            <span>Business name</span>
-            <input type="text" id="setBusinessName" class="input" />
+            <span>WhatsApp number</span>
+            <input type="tel"
+                   id="setWhatsapp"
+                   class="input"
+                   inputmode="numeric"
+                   placeholder="916200920746"
+                   autocomplete="off" />
+            <small class="hint">Digits only, with country code. Example: 916200920746</small>
           </label>
+
           <label class="field">
-            <span>WhatsApp number (country code, no +)</span>
-            <input type="text" id="setWhatsapp" class="input" placeholder="916200920746" />
+            <span>Phone</span>
+            <input type="tel" id="setPhone" class="input" placeholder="+91 62009 20746" autocomplete="off" />
           </label>
+
           <label class="field">
             <span>Email</span>
-            <input type="email" id="setEmail" class="input" />
+            <input type="email" id="setEmail" class="input" placeholder="hello@vionabangles.com" autocomplete="off" />
           </label>
+
           <label class="field">
-            <span>Phone (optional)</span>
-            <input type="text" id="setPhone" class="input" />
-          </label>
-          <label class="field">
-            <span>City</span>
-            <input type="text" id="setCity" class="input" />
-          </label>
-          <label class="field">
-            <span>Open hours</span>
-            <input type="text" id="setHours" class="input" />
+            <span>City or address</span>
+            <input type="text" id="setAddress" class="input" placeholder="Patna, Bihar" autocomplete="off" />
           </label>
         </div>
 
-        <h3 class="card-title">Hero</h3>
+        <label class="field">
+          <span>Delivery note</span>
+          <textarea id="setDeliveryNote"
+                    class="textarea"
+                    rows="3"
+                    placeholder="Free shipping across India on orders above ₹999."></textarea>
+        </label>
+
+        <!-- ---------- Social ---------- -->
+        <h3 class="card-title">Social links</h3>
         <div class="grid-2">
           <label class="field">
-            <span>Small label above heading</span>
-            <input type="text" id="setHeroLabel" class="input" />
+            <span>Instagram link</span>
+            <input type="url" id="setInstagram" class="input" placeholder="https://instagram.com/…" autocomplete="off" />
           </label>
-          <label class="field">
-            <span>Big heading</span>
-            <input type="text" id="setHeroHeading" class="input" />
-          </label>
-        </div>
-        <label class="field">
-          <span>Hero paragraph</span>
-          <textarea id="setHeroText" class="textarea" rows="3"></textarea>
-        </label>
 
-        <h3 class="card-title">About</h3>
-        <label class="field">
-          <span>About heading</span>
-          <input type="text" id="setAboutHeading" class="input" />
-        </label>
-        <label class="field">
-          <span>About paragraph</span>
-          <textarea id="setAboutText" class="textarea" rows="4"></textarea>
-        </label>
-
-        <h3 class="card-title">Policies</h3>
-        <label class="field">
-          <span>Delivery text</span>
-          <textarea id="setDelivery" class="textarea" rows="3"></textarea>
-        </label>
-        <label class="field">
-          <span>Payment text</span>
-          <textarea id="setPayment" class="textarea" rows="3"></textarea>
-        </label>
-        <label class="field">
-          <span>Return text</span>
-          <textarea id="setReturns" class="textarea" rows="3"></textarea>
-        </label>
-
-        <h3 class="card-title">Trust points (up to 3)</h3>
-        <div class="grid-3">
           <label class="field">
-            <span>Point 1</span>
-            <input type="text" id="setTrust1" class="input" />
-          </label>
-          <label class="field">
-            <span>Point 2</span>
-            <input type="text" id="setTrust2" class="input" />
-          </label>
-          <label class="field">
-            <span>Point 3</span>
-            <input type="text" id="setTrust3" class="input" />
-          </label>
-        </div>
-
-        <h3 class="card-title">Social links (optional)</h3>
-        <div class="grid-3">
-          <label class="field">
-            <span>Instagram URL</span>
-            <input type="url" id="setInstagram" class="input" placeholder="https://instagram.com/…" />
-          </label>
-          <label class="field">
-            <span>Facebook URL</span>
-            <input type="url" id="setFacebook" class="input" placeholder="https://facebook.com/…" />
-          </label>
-          <label class="field">
-            <span>YouTube URL</span>
-            <input type="url" id="setYoutube" class="input" placeholder="https://youtube.com/…" />
+            <span>Facebook link</span>
+            <input type="url" id="setFacebook" class="input" placeholder="https://facebook.com/…" autocomplete="off" />
           </label>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="btn btn-gold" id="saveSettingsBtn2">Save Settings</button>
+          <button type="button" class="btn btn-ghost" id="reloadSettingsBtn">Reload</button>
+          <button type="button" class="btn btn-gold" id="saveSettingsBtn2">Save settings</button>
         </div>
       </form>
-    </section>
-
-    <!-- =========================================================
-         TAB: FAQ
-         ========================================================= -->
-    <section class="tab-panel" id="panel-faq">
-      <header class="panel-head">
-        <div class="panel-head-text">
-          <h2 class="panel-title">FAQ</h2>
-          <p class="panel-sub">Questions shown on the website.</p>
-        </div>
-        <button type="button" class="btn btn-gold" id="newFaqBtn">+ New Question</button>
-      </header>
-
-      <div class="list-block" id="faqList">
-        <p class="loading-line">Loading FAQs…</p>
-      </div>
     </section>
 
   </main>
 </div>
 
 <!-- ============================================================
-     MODAL: PRODUCT EDIT
+     3. MODAL: ADD / EDIT PRODUCT
      ============================================================ -->
-<div class="modal" id="productModal" hidden>
+<div class="modal hidden" id="productModal">
   <div class="modal-backdrop" data-close="productModal"></div>
-  <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+
+  <div class="modal-panel modal-panel-wide"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="productModalTitle">
+
     <button type="button" class="modal-close" data-close="productModal" aria-label="Close">×</button>
 
-    <h2 class="modal-title" id="productModalTitle">Edit product</h2>
+    <h2 class="modal-title" id="productModalTitle">New product</h2>
     <p class="modal-sub" id="productModalSub">Fill in the details below.</p>
 
     <form class="modal-form" id="productForm" onsubmit="return false;">
@@ -361,16 +264,18 @@
       <div class="grid-2">
         <label class="field">
           <span>Name *</span>
-          <input type="text" id="pName" class="input" required maxlength="120" />
+          <input type="text" id="pName" class="input" maxlength="120" autocomplete="off" />
         </label>
+
         <label class="field">
-          <span>Product code (SKU)</span>
-          <input type="text" id="pCode" class="input" placeholder="VB-001" maxlength="40" />
-          <small class="hint">Leave blank to auto-assign VB-{id}.</small>
+          <span>Product code</span>
+          <input type="text" id="pCode" class="input" placeholder="VB-001" maxlength="40" autocomplete="off" />
+          <small class="hint">Must be unique. Leave blank to auto-assign VB-{id}.</small>
         </label>
+
         <label class="field">
           <span>Category *</span>
-          <select id="pCategory" class="input" required>
+          <select id="pCategory" class="input">
             <option value="">Choose a category…</option>
             <option value="glass">Glass</option>
             <option value="metal">Metal</option>
@@ -380,49 +285,35 @@
             <option value="kids">Kids</option>
           </select>
         </label>
+
         <label class="field">
-          <span>Price (₹) *</span>
-          <input type="number" id="pPrice" class="input" min="0" step="1" required />
+          <span>Price (Rs) *</span>
+          <input type="number" id="pPrice" class="input" min="0" step="1" inputmode="decimal" />
         </label>
       </div>
 
-      <label class="field">
-        <span>Available sizes</span>
-        <div class="chips-edit" id="pSizesChips"></div>
-        <div class="chip-add">
-          <input type="text" id="pNewSize" class="input" placeholder="e.g. 2.10" maxlength="10" />
-          <button type="button" class="btn btn-ghost" id="pAddSizeBtn">Add size</button>
+      <!-- ---------- Sizes ---------- -->
+      <div class="field">
+        <span class="field-label">Available sizes</span>
+        <div class="size-checks" id="pSizeChecks">
+          <label class="size-check"><input type="checkbox" value="2.2" /><span>2.2</span></label>
+          <label class="size-check"><input type="checkbox" value="2.4" /><span>2.4</span></label>
+          <label class="size-check"><input type="checkbox" value="2.6" /><span>2.6</span></label>
+          <label class="size-check"><input type="checkbox" value="2.8" /><span>2.8</span></label>
+          <label class="size-check"><input type="checkbox" value="2.10" /><span>2.10</span></label>
         </div>
-        <small class="hint">Common sizes: 2.2, 2.4, 2.6, 2.8</small>
-      </label>
+        <label class="field field-tight">
+          <span>Extra sizes (comma separated)</span>
+          <input type="text" id="pExtraSizes" class="input" placeholder="2.12, 2.14" autocomplete="off" />
+        </label>
+      </div>
 
       <label class="field">
         <span>Description</span>
         <textarea id="pDescription" class="textarea" rows="4" maxlength="1000"></textarea>
       </label>
 
-      <h3 class="card-title">Images</h3>
-      <p class="hint">The first image is the main image. Paste image URLs (from Supabase Storage or any CDN).</p>
-
-      <label class="field">
-        <span>Main image URL</span>
-        <input type="url" id="pMainImage" class="input" placeholder="https://…" />
-      </label>
-
-      <label class="field">
-        <span>Additional image URLs (one per line)</span>
-        <textarea id="pAdditionalImages" class="textarea" rows="3" placeholder="https://…&#10;https://…"></textarea>
-      </label>
-
-      <div class="grid-3">
-        <label class="switch">
-          <input type="checkbox" id="pIsActive" checked />
-          <span>Active (visible on site)</span>
-        </label>
-        <label class="switch">
-          <input type="checkbox" id="pIsFeatured" />
-          <span>Featured</span>
-        </label>
+      <div class="grid-2">
         <label class="field">
           <span>Stock status</span>
           <select id="pStockStatus" class="input">
@@ -431,63 +322,79 @@
             <option value="made_to_order">Made to order</option>
           </select>
         </label>
+
+        <label class="field">
+          <span>WhatsApp number (optional)</span>
+          <input type="tel" id="pWhatsapp" class="input" placeholder="Leave blank to use site default" autocomplete="off" />
+        </label>
       </div>
 
-      <label class="field">
-        <span>WhatsApp number override (optional)</span>
-        <input type="text" id="pWhatsapp" class="input" placeholder="Leave blank to use site default" />
-      </label>
+      <div class="switch-row">
+        <label class="switch">
+          <input type="checkbox" id="pIsActive" checked />
+          <span>Show on website</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="pIsFeatured" />
+          <span>Featured</span>
+        </label>
+      </div>
 
+      <!-- ---------- PHOTOS ---------- -->
+      <h3 class="card-title">Photos</h3>
+
+      <div class="photo-block">
+        <span class="field-label">Main photo</span>
+
+        <div class="photo-main" id="mainPhotoWrap">
+          <img class="photo-preview" id="mainPhotoPreview" alt="" hidden />
+          <div class="photo-empty" id="mainPhotoEmpty">No main photo yet</div>
+          <button type="button" class="photo-remove" id="mainPhotoRemove" hidden aria-label="Remove main photo">×</button>
+        </div>
+
+        <div class="photo-actions">
+          <label class="btn btn-ghost photo-btn">
+            <input type="file" id="mainPhotoInput" accept="image/*" hidden />
+            <span id="mainPhotoBtnLabel">Choose main photo</span>
+          </label>
+        </div>
+
+        <label class="field field-tight">
+          <span>or paste an image link</span>
+          <input type="url" id="pMainImageUrl" class="input" placeholder="https://…" autocomplete="off" />
+        </label>
+      </div>
+
+      <div class="photo-block">
+        <span class="field-label">More photos <small class="hint-inline">(max 5)</small></span>
+
+        <div class="photo-grid" id="morePhotosGrid"></div>
+
+        <div class="photo-actions">
+          <label class="btn btn-ghost photo-btn">
+            <input type="file" id="morePhotosInput" accept="image/*" multiple hidden />
+            <span>+ Add photos</span>
+          </label>
+        </div>
+
+        <small class="hint">JPG or PNG, up to 8 MB each. Images are resized automatically before upload.</small>
+      </div>
+
+      <p class="upload-status" id="uploadStatus" hidden></p>
       <p class="form-error" id="productFormError" hidden></p>
 
       <div class="form-actions">
         <button type="button" class="btn btn-ghost" data-close="productModal">Cancel</button>
-        <button type="button" class="btn btn-gold" id="saveProductBtn">Save Product</button>
+        <button type="button" class="btn btn-gold" id="saveProductBtn">Save product</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- ============================================================
-     MODAL: OFFER EDIT (placeholder — wired in a later part)
+     4. CONFIRM DIALOG
      ============================================================ -->
-<div class="modal" id="offerModal" hidden>
-  <div class="modal-backdrop" data-close="offerModal"></div>
-  <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" aria-labelledby="offerModalTitle">
-    <button type="button" class="modal-close" data-close="offerModal" aria-label="Close">×</button>
-    <h2 class="modal-title" id="offerModalTitle">Edit message</h2>
-    <p class="modal-sub">Offer editing is coming in a later step.</p>
-    <form class="modal-form" id="offerForm" onsubmit="return false;">
-      <input type="hidden" id="oEditId" value="" />
-      <div class="form-actions">
-        <button type="button" class="btn btn-ghost" data-close="offerModal">Close</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ============================================================
-     MODAL: FAQ EDIT (placeholder — wired in a later part)
-     ============================================================ -->
-<div class="modal" id="faqModal" hidden>
-  <div class="modal-backdrop" data-close="faqModal"></div>
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="faqModalTitle">
-    <button type="button" class="modal-close" data-close="faqModal" aria-label="Close">×</button>
-    <h2 class="modal-title" id="faqModalTitle">Edit question</h2>
-    <p class="modal-sub">FAQ editing is coming in a later step.</p>
-    <form class="modal-form" id="faqForm" onsubmit="return false;">
-      <input type="hidden" id="fEditId" value="" />
-      <div class="form-actions">
-        <button type="button" class="btn btn-ghost" data-close="faqModal">Close</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ============================================================
-     CONFIRM DIALOG
-     ============================================================ -->
-<div class="modal modal-small" id="confirmModal" hidden>
+<div class="modal modal-small hidden" id="confirmModal">
   <div class="modal-backdrop" data-close="confirmModal"></div>
   <div class="modal-panel" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h2 class="modal-title" id="confirmTitle">Are you sure?</h2>
@@ -500,15 +407,16 @@
 </div>
 
 <!-- ============================================================
-     TOAST + BUSY OVERLAY
+     5. TOAST + BUSY OVERLAY
      ============================================================ -->
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
 <div class="busy" id="busy" hidden>
   <div class="busy-spinner" aria-hidden="true"></div>
 </div>
 
 <!-- ============================================================
-     SCRIPTS
+     6. SCRIPTS
      ============================================================ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
