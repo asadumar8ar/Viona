@@ -18,6 +18,28 @@
 
 <!-- Site styles -->
 <link rel="stylesheet" href="css/style.css" />
+
+<!-- Small tweak so the injected Account button sits nicely in the header.
+     Everything else about the account UI is styled by js/auth.js itself. -->
+<style>
+  /* On desktop the account button lives in the nav row. */
+  @media (min-width: 900px) {
+    .header-nav #accountMount { margin-left: 4px; }
+  }
+  /* On mobile, put the Account button next to the hamburger so users can
+     reach login without opening the menu. */
+  @media (max-width: 899px) {
+    .header-inner #accountMount {
+      order: 3;
+      margin-left: 8px;
+    }
+    /* Auth button already has its own look; make it a bit tighter on mobile. */
+    .header-inner #accountMount .va-account-btn {
+      padding: 7px 12px;
+      font-size: 12px;
+    }
+  }
+</style>
 </head>
 <body>
 
@@ -30,8 +52,8 @@
 
 <!-- ==========================================================================
      SITE HEADER — sticky navy bar
-     Mobile : row 1 = logo + hamburger | row 2 = full width search bar
-     Desktop: logo left | big search centre | nav right
+     Mobile : row 1 = logo + account + hamburger | row 2 = full width search bar
+     Desktop: logo left | big search centre | nav + account right
      ========================================================================== -->
 <header class="site-header" id="siteHeader">
   <div class="header-inner">
@@ -92,6 +114,9 @@
         </svg>
       </a>
     </nav>
+
+    <!-- Account button — js/auth.js mounts itself here -->
+    <div id="accountMount"></div>
 
   </div>
 
@@ -453,7 +478,8 @@
             No reviews yet. Be the first to share your thoughts.
           </p>
 
-          <!-- Write / edit review area -->
+          <!-- Write / edit review area — filled by js/script.js
+               and wired to VionaAuth (shared login modal). -->
           <div class="review-form-wrap" id="reviewFormWrap"></div>
 
         </div>
@@ -491,9 +517,16 @@
 
 <!-- ==========================================================================
      SCRIPTS
+     Order matters:
+       1. supabase-js (CDN)
+       2. config.js   (defines window.VIONA_CONFIG)
+       3. auth.js     (shared login system, mounts Account button, creates
+                       the Supabase client used by script.js via VionaAuth.client)
+       4. script.js   (page logic — calls VionaAuth.init and uses its client)
      ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/script.js"></script>
 
 </body>
