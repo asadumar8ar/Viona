@@ -152,7 +152,7 @@ input, select, textarea { font-family: inherit; }
 }
 
 /* --------------------------------------------------------------------------
-   4. LOGIN SCREEN
+   4. LOGIN / NOT-ADMIN SCREEN
    -------------------------------------------------------------------------- */
 .screen {
   min-height: 100vh;
@@ -227,11 +227,12 @@ input, select, textarea { font-family: inherit; }
   margin: 0 0 16px;
   padding: 10px 12px;
   font-size: 13px;
-  text-align: left;
+  text-align: center;
   color: #B23A2F;
   background: #FDECEA;
   border: 1px solid #F4C7C2;
   border-radius: 10px;
+  word-break: break-all;
 }
 
 .config-warning {
