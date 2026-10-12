@@ -6,6 +6,7 @@
 
    Public API on window.VionaAuth:
      init()           -> Promise, sets everything up
+     ready()          -> Promise that resolves once init() is done
      getUser()        -> current Supabase user object (or null)
      getProfile()     -> current customers row object (or null)
      refreshProfile() -> re-fetch the customers row, return it
@@ -14,17 +15,23 @@
      logout()         -> signs out and cleans up
      onChange(cb)     -> fires cb(user, profile) on every auth change
      isAdmin()        -> Promise<boolean>, checks the admins table
+     client           -> shared Supabase client (supabase-js v2)
 
-   Bonus for other scripts:
-     client           -> the shared Supabase client (supabase-js v2)
-     ready()          -> Promise that resolves once init() is done
+   Features in this file:
+     - Google sign-in + Email/Password login + signup
+     - Password show/hide eye icons (login, signup, set-new-password)
+     - "Forgot password?" link -> reset-link form (30s cooldown)
+     - onAuthStateChange PASSWORD_RECOVERY event -> "Set new password" modal
+     - Customer profile (name, phone, city, avatar) with compressed upload
+     - Profile-completion prompt once per session
+     - Friendly English messages, try/catch everywhere, console.error on
+       real failures.
 
    Notes:
    - Reads SUPABASE_URL / SUPABASE_ANON_KEY from window.VIONA_CONFIG.
      There is NO SITE_URL key — redirect URLs are always built from
      window.location.origin.
-   - Never stores passwords or personal data by hand. The Supabase session
-     itself lives in browser storage — that is normal and handled by supabase-js.
+   - Never stores passwords or personal data by hand.
    ============================================================================ */
 
 (function () {
@@ -54,7 +61,14 @@
   var CONFIG_ERROR = configProblem();
 
   /* ==========================================================================
-     2. STATE
+     2. CONSTANTS
+     ========================================================================== */
+  var PROMPT_KEY = 'viona_profile_prompted';
+  var RESET_COOLDOWN_MS = 30000;   // 30 second cooldown on "Send reset link"
+  var RESET_COOLDOWN_KEY = 'viona_reset_cooldown_until';
+
+  /* ==========================================================================
+     3. STATE
      ========================================================================== */
   var state = {
     sb: null,
@@ -65,16 +79,16 @@
     listeners: [],
     lastFocused: null,
     dropdownOpen: false,
-    pendingAvatarBlob: null,      // compressed blob waiting to be uploaded on Save
-    pendingAvatarPreview: '',     // object URL for preview
-    pendingAvatarRemove: false,   // user clicked "Remove photo"
-    promptedThisSession: false
+    pendingAvatarBlob: null,
+    pendingAvatarPreview: '',
+    pendingAvatarRemove: false,
+    promptedThisSession: false,
+    resetCooldownTimer: null,
+    recoveryActive: false        // true while the "Set new password" modal is open
   };
 
-  var PROMPT_KEY = 'viona_profile_prompted';
-
   /* ==========================================================================
-     3. SMALL HELPERS
+     4. SMALL HELPERS
      ========================================================================== */
   function $(id) { return document.getElementById(id); }
 
@@ -96,44 +110,52 @@
     return /admin\.html$/i.test(window.location.pathname || '');
   }
 
-  // Where Supabase should send the browser back after Google sign-in.
   function loginRedirectUrl() {
     if (isAdminPage()) {
       return window.location.origin + '/admin.html';
     }
+    // Always redirect back to the page the user came from.
     return window.location.origin + window.location.pathname;
   }
 
   function friendlyAuthError(err) {
-    if (!err) return 'Kuch galat ho gaya. Please try again.';
+    if (!err) return 'Something went wrong. Please try again.';
     var msg = String(err.message || err.error_description || err || '');
     var lower = msg.toLowerCase();
 
     if (lower.indexOf('email not confirmed') !== -1) {
-      return 'Email abhi confirm nahi hua. Neeche "Resend email" tap karo.';
+      return 'Email is not confirmed yet. Tap "Resend email" below.';
     }
     if (lower.indexOf('invalid login credentials') !== -1) {
-      return 'Email ya password galat hai.';
+      return 'Wrong email or password.';
     }
     if (lower.indexOf('user already registered') !== -1 ||
         lower.indexOf('already been registered') !== -1 ||
         lower.indexOf('already exists') !== -1) {
-      return 'Ye email pehle se registered hai. Login karo.';
+      return 'This email is already registered. Please log in.';
     }
     if (lower.indexOf('password should be at least') !== -1 ||
         lower.indexOf('weak password') !== -1) {
-      return 'Password chhota hai. Kam se kam 6 characters daalo.';
+      return 'Password is too short. Use at least 6 characters.';
     }
     if (lower.indexOf('invalid email') !== -1) {
-      return 'Valid email address daalo.';
+      return 'Please enter a valid email address.';
     }
     if (lower.indexOf('rate limit') !== -1 || lower.indexOf('too many') !== -1) {
-      return 'Bahut attempts ho gaye. Ek minute ruk ke try karo.';
+      return 'Too many attempts. Please wait a minute and try again.';
     }
     if (lower.indexOf('network') !== -1 || lower.indexOf('failed to fetch') !== -1) {
-      return 'Network problem. Internet check karo.';
+      return 'Network problem. Please check your internet.';
     }
-    return msg || 'Kuch galat ho gaya. Please try again.';
+    if (lower.indexOf('same password') !== -1 ||
+        lower.indexOf('new password should be different') !== -1) {
+      return 'New password must be different from your old one.';
+    }
+    if (lower.indexOf('auth session missing') !== -1 ||
+        lower.indexOf('session_not_found') !== -1) {
+      return 'Your reset link has expired. Please request a new one.';
+    }
+    return msg || 'Something went wrong. Please try again.';
   }
 
   function friendlyStorageError(err) {
@@ -141,21 +163,21 @@
     var msg = String(err.message || err.error_description || err || '');
     var lower = msg.toLowerCase();
     if (lower.indexOf('bucket') !== -1 && lower.indexOf('not found') !== -1) {
-      return 'Storage bucket "avatars" nahi mila. Supabase me bucket banao (public).';
+      return 'Storage bucket "avatars" not found. Create it in Supabase (public).';
     }
     if (lower.indexOf('row-level security') !== -1 ||
         lower.indexOf('permission') !== -1 ||
         lower.indexOf('not allowed') !== -1) {
-      return 'Upload permission nahi hai. Supabase storage policies check karo.';
+      return 'Upload permission denied. Check Supabase storage policies.';
     }
     if (lower.indexOf('exceeded') !== -1 || lower.indexOf('too large') !== -1) {
-      return 'Photo bahut badi hai. 2 MB se chhoti chuno.';
+      return 'Photo is too large. Use an image under 2 MB.';
     }
     return msg || 'Upload failed.';
   }
 
   /* ==========================================================================
-     4. STYLE INJECTION
+     5. STYLE INJECTION
      ========================================================================== */
   var AUTH_CSS = '' +
     '.va-config-banner{position:fixed;top:0;left:0;right:0;z-index:99999;' +
@@ -268,9 +290,16 @@
       'border:1px solid #F2D9A4;border-radius:8px;font-size:12.5px;color:#7A4B00;' +
       'line-height:1.55}' +
     '.va-info[hidden]{display:none!important}' +
+    '.va-info.ok{background:#EAF7EE;border-color:#BEE3C7;color:#1E7A46}' +
     '.va-link{color:#0B1F3A;text-decoration:underline;font-weight:600;' +
       'cursor:pointer;background:none;border:0;padding:0;font:inherit}' +
     '.va-link:hover{color:#C9A24B}' +
+
+    '.va-forgot-row{display:flex;justify-content:flex-end;margin:-4px 0 12px}' +
+    '.va-forgot-link{background:none;border:0;padding:4px 0;font:inherit;' +
+      'font-size:12.5px;font-weight:500;color:#0B1F3A;text-decoration:underline;' +
+      'cursor:pointer}' +
+    '.va-forgot-link:hover{color:#C9A24B}' +
 
     /* avatar block in profile modal */
     '.va-avatar-block{display:flex;flex-direction:column;align-items:center;' +
@@ -356,7 +385,7 @@
   }
 
   /* ==========================================================================
-     5. MODAL MARKUP
+     6. SVG ICONS
      ========================================================================== */
   function googleIconSvg() {
     return '' +
@@ -368,19 +397,25 @@
       '</svg>';
   }
 
-  function eyeIconSvg(open) {
-    if (open) {
-      // eye-off
+  /* Pass true  -> show "eye-off" icon (password is hidden, click to show)
+     Pass false -> show "eye"    icon (password is visible, click to hide) */
+  function eyeIconSvg(isHidden) {
+    if (isHidden) {
       return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-6 0-10-5-10-8 0-1.24.5-2.5 1.35-3.62"/><path d="M6.06 6.06C7.94 4.79 10 4 12 4c6 0 10 5 10 8 0 1.1-.4 2.24-1.11 3.32"/><path d="M9.9 9.9A3 3 0 0 0 12 15a3 3 0 0 0 2.1-.9"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
     }
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-8 10-8 10 8 10 8-4 8-10 8S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
   }
 
+  /* ==========================================================================
+     7. MODAL MARKUP
+     Four modals: login/signup, forgot-password, set-new-password, profile.
+     ========================================================================== */
   function buildModals() {
     if ($('vaLoginModal')) return;
 
     var wrap = document.createElement('div');
     wrap.innerHTML =
+
       /* ---------- LOGIN / SIGNUP MODAL ---------- */
       '<div class="va-backdrop" id="vaLoginModal" hidden>' +
         '<div class="va-modal" role="dialog" aria-modal="true" aria-labelledby="vaLoginTitle">' +
@@ -403,7 +438,7 @@
 
           '<div class="va-or"><span>or</span></div>' +
 
-          /* Login form */
+          /* ----- Login form ----- */
           '<form class="va-form" id="vaLoginForm" novalidate>' +
             '<label class="va-field">' +
               '<span>Email</span>' +
@@ -418,14 +453,15 @@
                 '</button>' +
               '</span>' +
             '</label>' +
+            '<div class="va-forgot-row">' +
+              '<button type="button" class="va-forgot-link" id="vaForgotLink">Forgot password?</button>' +
+            '</div>' +
             '<p class="va-error" id="vaLoginError" role="alert" hidden></p>' +
-            '<p class="va-info" id="vaLoginResendWrap" hidden>' +
-              'Email confirm nahi hua. <button type="button" class="va-link" id="vaLoginResendBtn">Resend email</button>' +
-            '</p>' +
+            '<p class="va-info" id="vaLoginResendWrap" hidden></p>' +
             '<button type="submit" class="va-btn va-btn-gold" id="vaLoginSubmit">Login</button>' +
           '</form>' +
 
-          /* Signup form */
+          /* ----- Signup form ----- */
           '<form class="va-form" id="vaSignupForm" novalidate hidden>' +
             '<label class="va-field">' +
               '<span>Full name *</span>' +
@@ -455,6 +491,67 @@
             '<p class="va-error" id="vaSignupError" role="alert" hidden></p>' +
             '<p class="va-info" id="vaSignupInfo" hidden></p>' +
             '<button type="submit" class="va-btn va-btn-gold" id="vaSignupSubmit">Create Account</button>' +
+          '</form>' +
+        '</div>' +
+      '</div>' +
+
+      /* ---------- FORGOT PASSWORD MODAL ---------- */
+      '<div class="va-backdrop" id="vaForgotModal" hidden>' +
+        '<div class="va-modal" role="dialog" aria-modal="true" aria-labelledby="vaForgotTitle">' +
+          '<button type="button" class="va-modal-close" data-va-close aria-label="Close">×</button>' +
+          '<div class="va-modal-head">' +
+            '<div class="va-brand">Viona</div>' +
+            '<h2 class="va-modal-title" id="vaForgotTitle">Reset your password</h2>' +
+            '<p class="va-modal-sub">Enter your email and we will send you a reset link.</p>' +
+          '</div>' +
+
+          '<form class="va-form" id="vaForgotForm" novalidate>' +
+            '<label class="va-field">' +
+              '<span>Email</span>' +
+              '<input type="email" id="vaForgotEmail" autocomplete="email" required />' +
+            '</label>' +
+            '<p class="va-error" id="vaForgotError" role="alert" hidden></p>' +
+            '<p class="va-info" id="vaForgotInfo" hidden></p>' +
+            '<button type="submit" class="va-btn va-btn-gold" id="vaForgotSubmit">Send reset link</button>' +
+            '<div class="va-row">' +
+              '<button type="button" class="va-btn va-btn-ghost" id="vaForgotBack">Back to login</button>' +
+            '</div>' +
+          '</form>' +
+        '</div>' +
+      '</div>' +
+
+      /* ---------- SET NEW PASSWORD MODAL (after clicking the email link) ---------- */
+      '<div class="va-backdrop" id="vaSetPassModal" hidden>' +
+        '<div class="va-modal" role="dialog" aria-modal="true" aria-labelledby="vaSetPassTitle">' +
+          '<button type="button" class="va-modal-close" data-va-close aria-label="Close">×</button>' +
+          '<div class="va-modal-head">' +
+            '<div class="va-brand">Viona</div>' +
+            '<h2 class="va-modal-title" id="vaSetPassTitle">Set a new password</h2>' +
+            '<p class="va-modal-sub">Choose a new password (at least 6 characters).</p>' +
+          '</div>' +
+
+          '<form class="va-form" id="vaSetPassForm" novalidate>' +
+            '<label class="va-field">' +
+              '<span>New password</span>' +
+              '<span class="va-input-wrap">' +
+                '<input type="password" id="vaSetPassNew" autocomplete="new-password" minlength="6" required />' +
+                '<button type="button" class="va-eye" data-eye="vaSetPassNew" aria-label="Show password">' +
+                  eyeIconSvg(true) +
+                '</button>' +
+              '</span>' +
+            '</label>' +
+            '<label class="va-field">' +
+              '<span>Confirm new password</span>' +
+              '<span class="va-input-wrap">' +
+                '<input type="password" id="vaSetPassConfirm" autocomplete="new-password" minlength="6" required />' +
+                '<button type="button" class="va-eye" data-eye="vaSetPassConfirm" aria-label="Show password">' +
+                  eyeIconSvg(true) +
+                '</button>' +
+              '</span>' +
+            '</label>' +
+            '<p class="va-error" id="vaSetPassError" role="alert" hidden></p>' +
+            '<p class="va-info" id="vaSetPassInfo" hidden></p>' +
+            '<button type="submit" class="va-btn va-btn-gold" id="vaSetPassSubmit">Update password</button>' +
           '</form>' +
         '</div>' +
       '</div>' +
@@ -519,11 +616,11 @@
   }
 
   /* ==========================================================================
-     6. ACCOUNT BUTTON + DROPDOWN
+     8. ACCOUNT BUTTON + DROPDOWN
      ========================================================================== */
   function buildAccountUI() {
     var mount = $('accountMount');
-    if (!mount) return; // silently do nothing if not on the page
+    if (!mount) return;
 
     mount.classList.add('va-account-wrap');
     mount.innerHTML = '';
@@ -583,8 +680,7 @@
       var initial = (firstName.charAt(0) || 'V').toUpperCase();
 
       var avatarHtml = url
-        ? '<span class="va-account-avatar"><img src="' + esc(url) + '" alt="" ' +
-          'onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'<span class=&quot;va-account-letter&quot;>' + esc(initial) + '</span>\';" /></span>'
+        ? '<span class="va-account-avatar"><img src="' + esc(url) + '" alt="" /></span>'
         : '<span class="va-account-letter">' + esc(initial) + '</span>';
 
       btn.innerHTML =
@@ -633,7 +729,7 @@
   }
 
   /* ==========================================================================
-     7. UI HELPERS
+     9. UI HELPERS
      ========================================================================== */
   function setBusy(btn, busy, label) {
     if (!btn) return;
@@ -668,14 +764,16 @@
     el.hidden = true;
   }
 
-  function showInfo(id, msg) {
+  function showInfo(id, msg, isOk) {
     var el = $(id);
     if (!el) return;
     if (msg) {
       el.innerHTML = String(msg);
+      el.className = 'va-info' + (isOk ? ' ok' : '');
       el.hidden = false;
     } else {
       el.innerHTML = '';
+      el.className = 'va-info';
       el.hidden = true;
     }
   }
@@ -697,7 +795,7 @@
   }
 
   /* ==========================================================================
-     8. MODAL OPEN / CLOSE + FOCUS TRAP
+     10. MODAL OPEN / CLOSE
      ========================================================================== */
   function lockScroll() { document.body.classList.add('va-no-scroll'); }
 
@@ -714,9 +812,7 @@
     state.lastFocused = null;
   }
 
-  function openLogin(opts) {
-    opts = opts || {};
-
+  function openLogin() {
     var m = $('vaLoginModal');
     if (!m) return;
 
@@ -733,7 +829,6 @@
     resetEye('vaLoginPassword');
     resetEye('vaSignupPassword');
 
-    // On the admin page show a slightly different subtitle.
     var sub = $('vaLoginSub');
     if (sub) {
       sub.textContent = isAdminPage()
@@ -759,11 +854,92 @@
     restoreFocus();
   }
 
-  function openProfile(isCompletion) {
-    if (!state.user) {
-      openLogin();
-      return;
+  function openForgot() {
+    var m = $('vaForgotModal');
+    if (!m) return;
+
+    state.lastFocused = document.activeElement;
+
+    clearError('vaForgotError');
+    showInfo('vaForgotInfo', '');
+
+    // Prefill with whatever is in the login email field.
+    var loginEmail = $('vaLoginEmail');
+    var fEmail = $('vaForgotEmail');
+    if (fEmail && loginEmail && loginEmail.value) fEmail.value = loginEmail.value;
+    else if (fEmail) fEmail.value = '';
+
+    // If user is on the login modal, hide it while the forgot modal is open.
+    var loginModal = $('vaLoginModal');
+    if (loginModal) loginModal.hidden = true;
+
+    m.hidden = false;
+    lockScroll();
+
+    // Apply any residual cooldown from a previous page load.
+    applyResetCooldownFromStorage();
+
+    setTimeout(function () {
+      var f = $('vaForgotEmail');
+      if (f && f.focus) {
+        try { f.focus(); } catch (e) { /* ignore */ }
+      }
+    }, 60);
+  }
+
+  function closeForgot(backToLogin) {
+    var m = $('vaForgotModal');
+    if (m) m.hidden = true;
+
+    if (backToLogin) {
+      var loginModal = $('vaLoginModal');
+      if (loginModal) loginModal.hidden = false;
+    } else {
+      unlockScrollIfClear();
+      restoreFocus();
     }
+  }
+
+  function openSetPassword() {
+    var m = $('vaSetPassModal');
+    if (!m) return;
+
+    state.lastFocused = document.activeElement;
+    state.recoveryActive = true;
+
+    clearError('vaSetPassError');
+    showInfo('vaSetPassInfo', '');
+
+    var a = $('vaSetPassNew'); if (a) { a.value = ''; a.type = 'password'; }
+    var b = $('vaSetPassConfirm'); if (b) { b.value = ''; b.type = 'password'; }
+    resetEye('vaSetPassNew');
+    resetEye('vaSetPassConfirm');
+
+    // Close any other va-backdrop modals.
+    var loginModal = $('vaLoginModal'); if (loginModal) loginModal.hidden = true;
+    var forgotModal = $('vaForgotModal'); if (forgotModal) forgotModal.hidden = true;
+
+    m.hidden = false;
+    lockScroll();
+
+    setTimeout(function () {
+      var f = $('vaSetPassNew');
+      if (f && f.focus) {
+        try { f.focus(); } catch (e) { /* ignore */ }
+      }
+    }, 60);
+  }
+
+  function closeSetPassword() {
+    var m = $('vaSetPassModal');
+    if (m) m.hidden = true;
+    state.recoveryActive = false;
+    unlockScrollIfClear();
+    restoreFocus();
+  }
+
+  function openProfile(isCompletion) {
+    if (!state.user) { openLogin(); return; }
 
     var m = $('vaProfileModal');
     if (!m) return;
@@ -789,9 +965,7 @@
     if (cityEl) cityEl.value = initialCity;
     if (emailEl) emailEl.value = state.user.email || '';
 
-    // Reset pending avatar edit state.
     clearPendingAvatar();
-
     renderProfileAvatar();
 
     var missing = !initialName || initialPhone.length !== 10;
@@ -829,8 +1003,14 @@
       if (!openModal) return;
 
       if (e.key === 'Escape') {
+        // During recovery, don't let Escape silently drop the reset flow.
+        if (openModal.id === 'vaSetPassModal') {
+          e.preventDefault();
+          return;
+        }
         e.preventDefault();
         if (openModal.id === 'vaLoginModal') closeLogin();
+        else if (openModal.id === 'vaForgotModal') closeForgot(true);
         else if (openModal.id === 'vaProfileModal') closeProfile();
         return;
       }
@@ -860,7 +1040,7 @@
   }
 
   /* ==========================================================================
-     9. TABS + PASSWORD EYE
+     11. TABS + PASSWORD EYES
      ========================================================================== */
   function switchTab(name) {
     var loginForm = $('vaLoginForm');
@@ -910,7 +1090,67 @@
   }
 
   /* ==========================================================================
-     10. WIRE MODALS
+     12. FORGOT PASSWORD COOLDOWN
+     --------------------------------------------------------------------------
+     We keep the "cooldown until" timestamp in localStorage so a page reload
+     does not bypass the 30s limit.
+     ========================================================================== */
+  function getResetCooldownUntil() {
+    try {
+      var v = parseInt(localStorage.getItem(RESET_COOLDOWN_KEY) || '0', 10);
+      return isFinite(v) ? v : 0;
+    } catch (e) { return 0; }
+  }
+
+  function setResetCooldownUntil(ts) {
+    try { localStorage.setItem(RESET_COOLDOWN_KEY, String(ts)); } catch (e) {}
+  }
+
+  function applyResetCooldownFromStorage() {
+    var btn = $('vaForgotSubmit');
+    if (!btn) return;
+
+    if (state.resetCooldownTimer) {
+      clearInterval(state.resetCooldownTimer);
+      state.resetCooldownTimer = null;
+    }
+
+    var until = getResetCooldownUntil();
+    var remain = Math.ceil((until - Date.now()) / 1000);
+
+    if (remain <= 0) {
+      btn.disabled = false;
+      btn.textContent = 'Send reset link';
+      return;
+    }
+
+    startResetCooldownUI(remain);
+  }
+
+  function startResetCooldownUI(secondsLeft) {
+    var btn = $('vaForgotSubmit');
+    if (!btn) return;
+
+    btn.disabled = true;
+    var n = secondsLeft;
+    btn.textContent = 'Wait ' + n + 's';
+
+    if (state.resetCooldownTimer) clearInterval(state.resetCooldownTimer);
+    state.resetCooldownTimer = setInterval(function () {
+      n = Math.max(0, n - 1);
+      if (n <= 0) {
+        clearInterval(state.resetCooldownTimer);
+        state.resetCooldownTimer = null;
+        btn.disabled = false;
+        btn.textContent = 'Send reset link';
+      } else {
+        btn.textContent = 'Wait ' + n + 's';
+      }
+    }, 1000);
+  }
+
+  /* ==========================================================================
+     13. WIRE MODALS (buttons + forms)
      ========================================================================== */
   function wireModals() {
     document.addEventListener('click', function (e) {
@@ -922,12 +1162,22 @@
         var modal = closeBtn.closest('.va-backdrop');
         if (!modal) return;
         if (modal.id === 'vaLoginModal') closeLogin();
+        else if (modal.id === 'vaForgotModal') closeForgot(true);
+        else if (modal.id === 'vaSetPassModal') {
+          // During recovery, a close button on the set-password modal is
+          // disabled — the user must finish or reload the page.
+          if (!state.recoveryActive) closeSetPassword();
+        }
         else if (modal.id === 'vaProfileModal') closeProfile();
         return;
       }
 
       if (t.classList && t.classList.contains('va-backdrop')) {
         if (t.id === 'vaLoginModal') closeLogin();
+        else if (t.id === 'vaForgotModal') closeForgot(true);
+        else if (t.id === 'vaSetPassModal') {
+          if (!state.recoveryActive) closeSetPassword();
+        }
         else if (t.id === 'vaProfileModal') closeProfile();
       }
     });
@@ -953,16 +1203,21 @@
     var pl = $('vaProfileLogout');
     if (pl) pl.addEventListener('click', function () { closeProfile(); logout(); });
 
-    // Resend email (login tab)
-    var resendBtn = $('vaLoginResendBtn');
-    if (resendBtn) {
-      resendBtn.addEventListener('click', function () {
-        var email = String(($('vaLoginEmail') || {}).value || '').trim();
-        if (email) onResendEmail(email);
-      });
-    }
+    /* Forgot password */
+    var forgotLink = $('vaForgotLink');
+    if (forgotLink) forgotLink.addEventListener('click', openForgot);
 
-    // Phone inputs: digits only, max 10
+    var forgotForm = $('vaForgotForm');
+    if (forgotForm) forgotForm.addEventListener('submit', onForgotSubmit);
+
+    var forgotBack = $('vaForgotBack');
+    if (forgotBack) forgotBack.addEventListener('click', function () { closeForgot(true); });
+
+    /* Set new password */
+    var setPassForm = $('vaSetPassForm');
+    if (setPassForm) setPassForm.addEventListener('submit', onSetPasswordSubmit);
+
+    /* Phone inputs: digits only, max 10 */
     ['vaSignupPhone', 'vaProfilePhone'].forEach(function (id) {
       var el = $(id);
       if (!el) return;
@@ -972,7 +1227,7 @@
       });
     });
 
-    // Dropdown actions (My Profile / Logout)
+    /* Dropdown actions (My Profile / Logout) */
     document.addEventListener('click', function (e) {
       var t = e.target;
       if (!t || !t.closest) return;
@@ -983,21 +1238,18 @@
       else if (action === 'logout') { closeDropdown(); logout(); }
     });
 
-    // Avatar buttons in profile modal
+    /* Avatar buttons */
     var avatarInput = $('vaAvatarInput');
-    if (avatarInput) {
-      avatarInput.addEventListener('change', onAvatarFilePicked);
-    }
+    if (avatarInput) avatarInput.addEventListener('change', onAvatarFilePicked);
+
     var avatarRemove = $('vaAvatarRemove');
-    if (avatarRemove) {
-      avatarRemove.addEventListener('click', onAvatarRemoveClick);
-    }
+    if (avatarRemove) avatarRemove.addEventListener('click', onAvatarRemoveClick);
 
     wirePasswordEyes();
   }
 
   /* ==========================================================================
-     11. AUTH ACTIONS
+     14. AUTH ACTIONS — Google / Login / Signup / Resend
      ========================================================================== */
   async function onGoogleClick() {
     var btn = $('vaGoogleBtn');
@@ -1008,7 +1260,6 @@
         options: { redirectTo: loginRedirectUrl() }
       });
       if (res && res.error) throw res.error;
-      // Browser navigates away.
     } catch (err) {
       setBusy(btn, false);
       var msg = friendlyAuthError(err);
@@ -1027,7 +1278,7 @@
     var btn = $('vaLoginSubmit');
 
     if (!email || !password) {
-      showError('vaLoginError', 'Email aur password dono daalo.');
+      showError('vaLoginError', 'Please enter both email and password.');
       return;
     }
 
@@ -1041,9 +1292,9 @@
     } catch (err) {
       var msg = String(err && (err.message || err.error_description) || '').toLowerCase();
       if (msg.indexOf('email not confirmed') !== -1) {
-        showError('vaLoginError', 'Email abhi confirm nahi hua. Neeche "Resend email" tap karo.');
+        showError('vaLoginError', 'Email is not confirmed yet. Tap "Resend email" below.');
         showInfo('vaLoginResendWrap',
-          'Email confirm nahi hua. <button type="button" class="va-link" id="vaLoginResendBtn2">Resend email</button>');
+          'Email is not confirmed. <button type="button" class="va-link" id="vaLoginResendBtn2">Resend email</button>');
         var r2 = $('vaLoginResendBtn2');
         if (r2) r2.addEventListener('click', function () { onResendEmail(email); });
       } else {
@@ -1066,17 +1317,17 @@
     var city = String(($('vaSignupCity') || {}).value || '').trim();
     var btn = $('vaSignupSubmit');
 
-    if (!name) { showError('vaSignupError', 'Full name daalo.'); return; }
+    if (!name) { showError('vaSignupError', 'Please enter your full name.'); return; }
     if (!/^\d{10}$/.test(phone)) {
-      showError('vaSignupError', 'Valid 10 digit mobile number daalo.');
+      showError('vaSignupError', 'Please enter a valid 10-digit mobile number.');
       return;
     }
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      showError('vaSignupError', 'Valid email address daalo.');
+      showError('vaSignupError', 'Please enter a valid email address.');
       return;
     }
     if (password.length < 6) {
-      showError('vaSignupError', 'Password kam se kam 6 characters ka hona chahiye.');
+      showError('vaSignupError', 'Password must be at least 6 characters.');
       return;
     }
 
@@ -1101,13 +1352,11 @@
 
       if (hasSession) {
         closeLogin();
-        showToast('Account ban gaya, welcome!');
-        // handleAuthChange will run automatically via onAuthStateChange.
+        showToast('Account created. Welcome!');
       } else {
-        // Email confirmation is ON. Show info + resend.
         showInfo('vaSignupInfo',
-          'Confirmation mail bheji gayi, inbox check karo. ' +
-          'Nahi mili? <button type="button" class="va-link" id="vaSignupResendBtn">Resend email</button>');
+          'Confirmation email sent. Please check your inbox (also check Spam). ' +
+          'Didn\'t get it? <button type="button" class="va-link" id="vaSignupResendBtn">Resend email</button>');
         var rb = $('vaSignupResendBtn');
         if (rb) rb.addEventListener('click', function () { onResendEmail(email); });
       }
@@ -1127,7 +1376,7 @@
         options: { emailRedirectTo: loginRedirectUrl() }
       });
       if (res && res.error) throw res.error;
-      showToast('Confirmation mail dobara bhej di. Inbox check karo.');
+      showToast('Confirmation email sent again. Please check your inbox.');
     } catch (err) {
       showToast(friendlyAuthError(err), 'error');
     }
@@ -1148,14 +1397,111 @@
     emitChange();
     showToast('Logged out.');
 
-    // On the admin page, reload so admin.js shows the login screen again.
     if (isAdminPage()) {
       setTimeout(function () { window.location.reload(); }, 350);
     }
   }
 
   /* ==========================================================================
-     12. PROFILE — FETCH / ENSURE / SAVE
+     15. FORGOT PASSWORD — SEND RESET LINK
+     ========================================================================== */
+  async function onForgotSubmit(e) {
+    e.preventDefault();
+    clearError('vaForgotError');
+    showInfo('vaForgotInfo', '');
+
+    var email = String(($('vaForgotEmail') || {}).value || '').trim();
+    var btn = $('vaForgotSubmit');
+
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      showError('vaForgotError', 'Please enter a valid email address.');
+      return;
+    }
+
+    // Enforce cooldown (also blocks double-click).
+    var until = getResetCooldownUntil();
+    if (until && Date.now() < until) {
+      var remain = Math.ceil((until - Date.now()) / 1000);
+      showError('vaForgotError', 'Please wait ' + remain + 's before trying again.');
+      startResetCooldownUI(remain);
+      return;
+    }
+
+    setBusy(btn, true, 'Sending…');
+    try {
+      // redirectTo makes Supabase send the user back to index.html with a
+      // recovery token. The PASSWORD_RECOVERY event will open the
+      // "Set new password" modal.
+      var res = await state.sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/index.html'
+      });
+      if (res && res.error) throw res.error;
+
+      // Start the 30s cooldown.
+      var cooldownUntil = Date.now() + RESET_COOLDOWN_MS;
+      setResetCooldownUntil(cooldownUntil);
+
+      showInfo(
+        'vaForgotInfo',
+        'Reset link sent. Please check your email, also check Spam.',
+        true
+      );
+    } catch (err) {
+      showError('vaForgotError', friendlyAuthError(err));
+      console.error('[VionaAuth] resetPasswordForEmail failed:', err);
+    } finally {
+      // setBusy(false) re-enables the button, but our cooldown will
+      // immediately disable it again. That's fine — the cooldown
+      // supersedes the "loading" state.
+      setBusy(btn, false);
+      applyResetCooldownFromStorage();
+    }
+  }
+
+  /* ==========================================================================
+     16. SET NEW PASSWORD (recovery flow)
+     ========================================================================== */
+  async function onSetPasswordSubmit(e) {
+    e.preventDefault();
+    clearError('vaSetPassError');
+    showInfo('vaSetPassInfo', '');
+
+    var a = String(($('vaSetPassNew') || {}).value || '');
+    var b = String(($('vaSetPassConfirm') || {}).value || '');
+    var btn = $('vaSetPassSubmit');
+
+    if (a.length < 6) {
+      showError('vaSetPassError', 'Password must be at least 6 characters.');
+      return;
+    }
+    if (a !== b) {
+      showError('vaSetPassError', 'Both passwords must match.');
+      return;
+    }
+
+    setBusy(btn, true, 'Updating…');
+    try {
+      var res = await state.sb.auth.updateUser({ password: a });
+      if (res && res.error) throw res.error;
+
+      showInfo('vaSetPassInfo', 'Password updated.', true);
+      showToast('Password updated.');
+
+      // Close recovery mode and the modal after a short beat so the user
+      // sees the success message.
+      state.recoveryActive = false;
+      cleanAuthUrl();
+      setTimeout(function () { closeSetPassword(); }, 900);
+    } catch (err) {
+      showError('vaSetPassError', friendlyAuthError(err));
+      console.error('[VionaAuth] updateUser (password) failed:', err);
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  /* ==========================================================================
+     17. PROFILE — FETCH / ENSURE / SAVE
      ========================================================================== */
   async function fetchProfile(user) {
     if (!user || !state.sb) return null;
@@ -1190,7 +1536,6 @@
     var existing = await fetchProfile(user);
 
     if (!existing) {
-      // Create a fresh row from metadata.
       var insertPayload = {
         id: user.id,
         name: fromMeta.name,
@@ -1208,15 +1553,11 @@
         if (ins && !ins.error && ins.data) return ins.data;
       } catch (e) { /* ignore */ }
 
-      // Try fetching once more (in case a DB trigger already created it).
       var again = await fetchProfile(user);
       if (again) return again;
-
-      // Fall back to an in-memory object.
       return insertPayload;
     }
 
-    // Row exists — only patch EMPTY fields from metadata. Never overwrite.
     var patch = {};
     var changed = false;
     if (!existing.name && fromMeta.name) { patch.name = fromMeta.name; changed = true; }
@@ -1265,9 +1606,8 @@
 
   function wasPrompted() {
     if (state.promptedThisSession) return true;
-    try {
-      return sessionStorage.getItem(PROMPT_KEY) === '1';
-    } catch (e) { return false; }
+    try { return sessionStorage.getItem(PROMPT_KEY) === '1'; }
+    catch (e) { return false; }
   }
 
   /* -------- Avatar editing (preview + save flow) -------- */
@@ -1328,15 +1668,13 @@
     e.target.value = '';
     if (!file) return;
 
-    // Validate type
     var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (allowed.indexOf(file.type) === -1) {
-      showError('vaProfileError', 'Sirf JPG, PNG ya WEBP photo chuno.');
+      showError('vaProfileError', 'Please choose a JPG, PNG or WEBP image.');
       return;
     }
-    // Validate size (max 2 MB)
     if (file.size > 2 * 1024 * 1024) {
-      showError('vaProfileError', 'Photo 2 MB se chhoti honi chahiye.');
+      showError('vaProfileError', 'Photo must be under 2 MB.');
       return;
     }
 
@@ -1350,7 +1688,7 @@
       state.pendingAvatarRemove = false;
       renderProfileAvatar();
     } catch (err) {
-      showError('vaProfileError', 'Photo process nahi ho payi. Dobara try karo.');
+      showError('vaProfileError', 'Could not process the photo. Please try again.');
     }
   }
 
@@ -1361,7 +1699,6 @@
   }
 
   async function uploadAvatarBlob(userId, blob) {
-    // Always store as jpg for a small, consistent file.
     var path = userId + '/avatar.jpg';
     var up = await state.sb.storage
       .from('avatars')
@@ -1375,7 +1712,6 @@
     var pub = state.sb.storage.from('avatars').getPublicUrl(path);
     var url = (pub && pub.data && pub.data.publicUrl) || '';
     if (!url) throw new Error('No public URL returned.');
-    // Cache-bust so the new photo shows immediately.
     return url + '?v=' + Date.now();
   }
 
@@ -1394,9 +1730,9 @@
     var city = String(($('vaProfileCity') || {}).value || '').trim();
     var btn = $('vaProfileSubmit');
 
-    if (!name) { showError('vaProfileError', 'Full name daalo.'); return; }
+    if (!name) { showError('vaProfileError', 'Please enter your full name.'); return; }
     if (!/^\d{10}$/.test(phone)) {
-      showError('vaProfileError', 'Valid 10 digit mobile number daalo.');
+      showError('vaProfileError', 'Please enter a valid 10-digit mobile number.');
       return;
     }
     if (!state.user) { closeProfile(); return; }
@@ -1405,7 +1741,6 @@
     try {
       var userId = state.user.id;
 
-      // 1. If the user picked a new photo, upload it now.
       var newAvatarUrl = null;
       if (state.pendingAvatarBlob) {
         try {
@@ -1414,12 +1749,10 @@
           throw new Error(friendlyStorageError(upErr));
         }
       } else if (state.pendingAvatarRemove) {
-        // Delete the file in storage (best effort) and clear the URL.
         await deleteAvatarFile(userId);
-        newAvatarUrl = ''; // explicitly empty
+        newAvatarUrl = '';
       }
 
-      // 2. Build the customers update payload.
       var payload = {
         id: userId,
         name: name,
@@ -1441,12 +1774,8 @@
 
       state.profile = res.data || payload;
 
-      // 3. Sync user metadata so signin on other devices gets the same info.
       try {
-        var metaUpdate = {
-          full_name: name,
-          phone: phone
-        };
+        var metaUpdate = { full_name: name, phone: phone };
         if (payload.avatar_url !== undefined) {
           metaUpdate.avatar_url = payload.avatar_url || null;
         }
@@ -1460,7 +1789,7 @@
       emitChange();
     } catch (err) {
       showError('vaProfileError',
-        (err && err.message) ? err.message : 'Save nahi ho paya. Dobara try karo.');
+        (err && err.message) ? err.message : 'Could not save. Please try again.');
     } finally {
       setBusy(btn, false);
     }
@@ -1487,7 +1816,6 @@
               canvas.width = tw;
               canvas.height = th;
               var ctx = canvas.getContext('2d');
-              // White background in case the source had transparency.
               ctx.fillStyle = '#FFFFFF';
               ctx.fillRect(0, 0, tw, th);
               ctx.drawImage(img, 0, 0, tw, th);
@@ -1506,7 +1834,7 @@
   }
 
   /* ==========================================================================
-     13. ADMIN CHECK
+     18. ADMIN CHECK
      ========================================================================== */
   async function checkIsAdmin(email) {
     if (!email || !state.sb) return false;
@@ -1525,7 +1853,7 @@
   }
 
   /* ==========================================================================
-     14. AUTH STATE HANDLING
+     19. AUTH STATE HANDLING
      ========================================================================== */
   function emitChange() {
     var list = state.listeners.slice();
@@ -1544,7 +1872,9 @@
 
       if (h.indexOf('access_token') !== -1 ||
           h.indexOf('refresh_token') !== -1 ||
-          h.indexOf('error_description') !== -1) {
+          h.indexOf('error_description') !== -1 ||
+          h.indexOf('type=recovery') !== -1 ||
+          h.indexOf('type%3Drecovery') !== -1) {
         h = '';
         changed = true;
       }
@@ -1553,7 +1883,8 @@
         var parts = s.substring(1).split('&').filter(function (p) {
           return p.indexOf('code=') !== 0 &&
                  p.indexOf('state=') !== 0 &&
-                 p.indexOf('error=') !== 0;
+                 p.indexOf('error=') !== 0 &&
+                 p.indexOf('type=') !== 0;
         });
         s = parts.length ? '?' + parts.join('&') : '';
         changed = true;
@@ -1565,7 +1896,7 @@
     } catch (e) { /* ignore */ }
   }
 
-  async function handleAuthChange(session) {
+  async function handleAuthChange(session, event) {
     var user = (session && session.user) ? session.user : null;
 
     // Same user as before? Refresh profile quietly and move on.
@@ -1598,7 +1929,6 @@
     updateAccountUI();
     emitChange();
 
-    // Clean up auth params in the URL now that we have a session.
     cleanAuthUrl();
 
     // If name or phone is missing, prompt ONCE per session on the public site.
@@ -1609,7 +1939,7 @@
   }
 
   /* ==========================================================================
-     15. BOOT
+     20. BOOT
      ========================================================================== */
   var _initPromise = null;
 
@@ -1626,7 +1956,7 @@
 
         if (!window.supabase || typeof window.supabase.createClient !== 'function') {
           showConfigBanner(
-            'Supabase library load nahi hui. Internet check karo aur page reload karo.'
+            'Supabase library did not load. Please check your internet and reload.'
           );
           resolve(false);
           return;
@@ -1646,7 +1976,7 @@
           );
         } catch (e) {
           showConfigBanner(
-            'Supabase start nahi ho paya. ' + (e && e.message ? e.message : '')
+            'Could not start Supabase. ' + (e && e.message ? e.message : '')
           );
           resolve(false);
           return;
@@ -1657,13 +1987,41 @@
         wireModals();
         attachGlobalKeyHandler();
 
+        /* ---- Detect recovery link in the URL, even before onAuthStateChange
+                fires. Supabase sets type=recovery in the hash when the user
+                clicks the email link. ---- */
+        var hadRecoveryHash = false;
         try {
-          state.sb.auth.onAuthStateChange(function (_event, session) {
+          var h = window.location.hash || '';
+          if (h.indexOf('type=recovery') !== -1 || h.indexOf('type%3Drecovery') !== -1) {
+            hadRecoveryHash = true;
+          }
+        } catch (e) { /* ignore */ }
+
+        try {
+          state.sb.auth.onAuthStateChange(function (event, session) {
             // Defer so supabase-js internals are not blocked.
             setTimeout(function () {
-              handleAuthChange(session).catch(function (e) {
-                console.warn('[VionaAuth] auth change failed:', e);
-              });
+              try {
+                if (event === 'PASSWORD_RECOVERY') {
+                  // User clicked the reset link — show "Set new password".
+                  openSetPassword();
+                }
+
+                handleAuthChange(session, event).catch(function (e) {
+                  console.warn('[VionaAuth] auth change failed:', e);
+                });
+
+                // If we saw a recovery hash but the event did not fire
+                // (rare), still clean up the URL and open the modal.
+                if (hadRecoveryHash && !state.recoveryActive) {
+                  openSetPassword();
+                  cleanAuthUrl();
+                  hadRecoveryHash = false;
+                }
+              } catch (e) {
+                console.warn('[VionaAuth] auth event handler failed:', e);
+              }
             }, 0);
           });
         } catch (e) {
@@ -1674,9 +2032,16 @@
           try {
             var res = await state.sb.auth.getSession();
             var session = (res && res.data) ? res.data.session : null;
-            await handleAuthChange(session);
+            await handleAuthChange(session, 'INITIAL_SESSION');
+
+            // If the URL had a recovery hash but onAuthStateChange missed it,
+            // open the modal here as a safety net.
+            if (hadRecoveryHash && !state.recoveryActive) {
+              openSetPassword();
+              cleanAuthUrl();
+            }
           } catch (e) {
-            // Ignore — UI just stays logged-out.
+            // Ignore — the UI just stays logged-out.
           }
           resolve(true);
         })();
@@ -1700,7 +2065,7 @@
   }
 
   /* ==========================================================================
-     16. PUBLIC API
+     21. PUBLIC API
      ========================================================================== */
   window.VionaAuth = {
     // Setup
@@ -1717,7 +2082,7 @@
     },
 
     // UI
-    openLogin: function (opts) { return openLogin(opts); },
+    openLogin: function () { return openLogin(); },
     openProfile: function () { return openProfile(false); },
     logout: function () { return logout(); },
 
