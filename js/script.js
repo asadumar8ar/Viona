@@ -1,20 +1,24 @@
 /* ============================================================================
    Viona Bangles — js/script.js
    ----------------------------------------------------------------------------
-   Public website logic:
-     - Loads products, offers, FAQs, settings from Supabase
-     - Falls back to demo products if Supabase is not configured or fails
+   Public website logic. Rewritten to use the shared js/auth.js module
+   (window.VionaAuth) for authentication, so the reviews section no longer
+   shows "login is not provided" and Google sign-in uses a proper redirectTo.
+
+   Responsibilities:
+     - Load products, offers, FAQs, settings from Supabase
+     - Fall back to demo products if Supabase is not configured or fails
      - Header search + suggestions, category strip
      - Product modal with image gallery, size chips, WhatsApp button
      - Offers: strip, banner carousel, popup (each hidden if empty)
-     - Reviews: summary, list, sort, form, lightbox
+     - Reviews: summary, list, sort, form (wired to VionaAuth), lightbox
      - Deep link #product=VB-001
 
-   SAFETY RULES FOLLOWED:
-     - Every network call is inside try/catch
-     - Every DOM element is checked before use
-     - All database/user text is escaped before being put into innerHTML
-     - If Supabase is missing, the site runs on demo data with no visible error
+   Reviews schema used (matches the SQL we ran in Supabase):
+     reviews(id, product_id, user_id, customer_name, rating, comment,
+             image_url, created_at)
+     Storage bucket: "review-images"
+     customers(id, name, phone, email, city, ...)
    ============================================================================ */
 
 (function () {
@@ -22,47 +26,32 @@
 
   /* ==========================================================================
      1. CONFIG + SUPABASE CLIENT
+     --------------------------------------------------------------------------
+     The client is now owned by js/auth.js. We just wait for it to be ready.
      ========================================================================== */
 
   var CFG = window.VIONA_CONFIG || {};
+  var sb = null;
+  var SUPABASE_READY = false;
 
-  // Detect placeholder values and treat them as "not configured"
-  function isPlaceholder(v){
+  function isPlaceholder(v) {
     return !v || typeof v !== 'string' ||
            v.indexOf('PASTE_') === 0 ||
            v.indexOf('PASTE_YOUR') !== -1 ||
            v.indexOf('.supabase.co') === -1;
   }
 
-  var SUPABASE_READY = false;
-  var sb = null;
-
-  try {
-    if (!isPlaceholder(CFG.SUPABASE_URL) && !isPlaceholder(CFG.SUPABASE_ANON_KEY)) {
-      // The global `supabase` object comes from the CDN script tag in index.html
-      if (window.supabase && typeof window.supabase.createClient === 'function') {
-        sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
-          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-        });
-        SUPABASE_READY = true;
-      }
-    }
-  } catch (e) {
-    // Swallow any error here — the site will just use demo data
-    SUPABASE_READY = false;
-    sb = null;
+  function cfgLooksOk() {
+    return !isPlaceholder(CFG.SUPABASE_URL) && !isPlaceholder(CFG.SUPABASE_ANON_KEY);
   }
 
   /* ==========================================================================
      2. SMALL UTILITY HELPERS
      ========================================================================== */
+  function el(id) { return document.getElementById(id); }
 
-  // Safe element lookup (never throws if missing)
-  function el(id){ return document.getElementById(id); }
-
-  // Escape any text before inserting into innerHTML
-  function esc(s){
-    if (s === null || s === undefined) return '';
+  function esc(s) {
+    if (s == null) return '';
     return String(s)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -70,51 +59,42 @@
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   }
+  function escAttr(s) { return esc(s); }
 
-  // Escape for use inside an attribute value
-  function escAttr(s){ return esc(s); }
-
-  // Build a safe WhatsApp link
-  function waLink(number, message){
+  function waLink(number, message) {
     var n = String(number || '').replace(/[^0-9]/g, '');
     var text = encodeURIComponent(message || '');
     return 'https://wa.me/' + n + (text ? '?text=' + text : '');
   }
 
-  // Format a price like "Rs 799"
-  function money(n){
+  function money(n) {
     var num = Number(n);
     if (isNaN(num)) num = 0;
-    // Show without decimals if whole number
     var s = (num % 1 === 0) ? String(num) : num.toFixed(2);
     return 'Rs ' + s;
   }
 
-  // Discount percentage (returns 0 if none)
-  function discountPct(price, oldPrice){
+  function discountPct(price, oldPrice) {
     var p = Number(price), o = Number(oldPrice);
     if (!o || !p || o <= p) return 0;
     return Math.round(((o - p) / o) * 100);
   }
 
-  // Product code from id -> "VB-001"
-  function productCode(id){
+  function productCode(id) {
     var n = Number(id) || 0;
     var s = String(n);
     while (s.length < 3) s = '0' + s;
     return 'VB-' + s;
   }
 
-  // Code -> id ("VB-001" -> 1). Returns 0 if invalid.
-  function codeToId(code){
+  function codeToId(code) {
     if (!code) return 0;
     var m = String(code).toUpperCase().match(/^VB-(\d+)$/);
     if (!m) return 0;
     return parseInt(m[1], 10);
   }
 
-  // Format date as "12 Sep 2025"
-  function formatDate(iso){
+  function formatDate(iso) {
     if (!iso) return '';
     try {
       var d = new Date(iso);
@@ -124,8 +104,7 @@
     } catch (e) { return ''; }
   }
 
-  // Build 5-star HTML from a rating 0-5
-  function starsHtml(rating){
+  function starsHtml(rating) {
     var r = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
     var out = '';
     for (var i = 1; i <= 5; i++) {
@@ -134,8 +113,7 @@
     return out;
   }
 
-  // Debounce
-  function debounce(fn, ms){
+  function debounce(fn, ms) {
     var t = null;
     return function () {
       var args = arguments, self = this;
@@ -144,14 +122,12 @@
     };
   }
 
-  // Simple toast
   var toastTimer = null;
-  function toast(msg){
+  function toast(msg) {
     var t = el('toast');
     if (!t) return;
     t.textContent = String(msg || '');
     t.hidden = false;
-    // Force reflow so the transition can run
     void t.offsetWidth;
     t.classList.add('is-visible');
     clearTimeout(toastTimer);
@@ -161,39 +137,42 @@
     }, 2600);
   }
 
-  // Safe sessionStorage wrapper
-  function sessionGet(key){
+  function sessionGet(key) {
     try { return window.sessionStorage.getItem(key); } catch (e) { return null; }
   }
-  function sessionSet(key, val){
+  function sessionSet(key, val) {
     try { window.sessionStorage.setItem(key, val); } catch (e) { /* ignore */ }
   }
 
   /* ==========================================================================
      3. STATE
      ========================================================================== */
-
   var state = {
-    products: [],              // all active products
-    filtered: [],              // current grid
-    categories: [],            // ["All", "Glass", ...]
+    products: [],
+    filtered: [],
+    categories: [],
     activeCategory: 'All',
     searchTerm: '',
     faqs: [],
-    settings: {},              // { business, hero, about, policies, trust, social }
+    settings: {},
     offers: { strips: [], banners: [], popups: [] },
-    currentProduct: null,      // product open in the modal
-    currentSize: null,         // selected size chip
+    currentProduct: null,
+    currentSize: null,
     currentImageIndex: 0,
     galleryImages: [],
 
     // Reviews
-    reviews: [],               // approved reviews for current product
-    reviewsByRating: { 5:0, 4:0, 3:0, 2:0, 1:0 },
+    reviews: [],
     reviewSort: 'newest',
-    currentUser: null,         // Supabase auth user
-    myReview: null,            // current user's review for current product
+    currentUser: null,
+    currentProfile: null,
+    myReview: null,
     editingReview: false,
+
+    // Review form (transient)
+    pickerRating: 0,
+    reviewFile: null,        // { blob, preview } or null
+    reviewPreviewUrl: '',    // for cleanup
 
     // Lightbox
     lightbox: { images: [], index: 0 },
@@ -210,9 +189,8 @@
   };
 
   /* ==========================================================================
-     4. DEMO PRODUCTS (used only when Supabase is not configured or fails)
+     4. DEMO PRODUCTS + FAQS (offline fallback)
      ========================================================================== */
-
   var DEMO_PRODUCTS = [
     { id: 1, name: 'Classic Glass Bangles', category: 'Glass', price: 799, old_price: null,
       sizes: ['2.2','2.4','2.6','2.8'],
@@ -264,8 +242,7 @@
   /* ==========================================================================
      5. LOAD SITE SETTINGS
      ========================================================================== */
-
-  async function loadSettings(){
+  async function loadSettings() {
     var defaults = {
       business: {
         business_name: CFG.BUSINESS_NAME || 'Viona Bangles',
@@ -302,7 +279,7 @@
       social:   Object.assign({}, defaults.social)
     };
 
-    if (!SUPABASE_READY) return merged;
+    if (!SUPABASE_READY || !sb) return merged;
 
     try {
       var res = await sb.from('site_settings').select('key,value');
@@ -319,14 +296,12 @@
           merged[key] = val;
         }
       });
-    } catch (e) {
-      // Quietly keep defaults
-    }
+    } catch (e) { /* quietly keep defaults */ }
 
     return merged;
   }
 
-  function applySettings(){
+  function applySettings() {
     var s = state.settings || {};
     var b = s.business || {};
     var h = s.hero || {};
@@ -337,16 +312,13 @@
     var waNum = b.whatsapp || CFG.WHATSAPP_NUMBER || '';
     var waMsg = 'Hello Viona Bangles, I would like to know more about your bangles.';
 
-    // Hero
     var heroLabel = el('heroLabel');   if (heroLabel) heroLabel.textContent = h.label || '';
     var heroHead  = el('heroHeading'); if (heroHead)  heroHead.textContent  = h.heading || '';
     var heroText  = el('heroText');    if (heroText)  heroText.textContent  = h.text || '';
 
-    // About
     var aboutHead = el('aboutHeading'); if (aboutHead) aboutHead.textContent = a.heading || '';
     var aboutText = el('aboutText');    if (aboutText) aboutText.textContent = a.text || '';
 
-    // About points
     var aboutPoints = el('aboutPoints');
     if (aboutPoints) {
       var pts = Array.isArray(t.points) ? t.points : [];
@@ -358,7 +330,6 @@
       aboutPoints.innerHTML = pptHtml;
     }
 
-    // Trust strip
     var trustSection = el('trustSection');
     var trustList = el('trustList');
     if (trustSection && trustList) {
@@ -376,7 +347,6 @@
       }
     }
 
-    // Contact
     var cCity  = el('contactCity');  if (cCity)  cCity.textContent  = b.city || CFG.CITY || '';
     var cHours = el('contactHours'); if (cHours) cHours.textContent = b.hours || CFG.HOURS || '';
 
@@ -389,12 +359,10 @@
 
     var cPhone = el('contactPhone');
     if (cPhone) {
-      var display = b.phone || waNum;
-      cPhone.textContent = display ? ('+' + String(waNum).replace(/^\+/, '')) : 'WhatsApp';
+      cPhone.textContent = '+' + String(waNum).replace(/^\+/, '');
       cPhone.href = waLink(waNum, waMsg);
     }
 
-    // Footer
     var fCity  = el('footerCity');  if (fCity)  fCity.textContent  = b.city || CFG.CITY || '';
     var fHours = el('footerHours'); if (fHours) fHours.textContent = b.hours || CFG.HOURS || '';
 
@@ -410,7 +378,6 @@
     var heroWa = el('heroWhatsApp'); if (heroWa) heroWa.href = waLink(waNum, waMsg);
     var cWa = el('contactWhatsApp'); if (cWa) cWa.href = waLink(waNum, waMsg);
 
-    // Social
     var socialWrap = el('contactSocial');
     if (socialWrap) {
       var socialHtml = '';
@@ -420,7 +387,6 @@
       socialWrap.innerHTML = socialHtml;
     }
 
-    // Footer year
     var y = el('footerYear');
     if (y) y.textContent = String(new Date().getFullYear());
   }
@@ -428,9 +394,8 @@
   /* ==========================================================================
      6. LOAD PRODUCTS
      ========================================================================== */
-
-  async function loadProducts(){
-    if (!SUPABASE_READY) {
+  async function loadProducts() {
+    if (!SUPABASE_READY || !sb) {
       state.products = DEMO_PRODUCTS.slice();
       return;
     }
@@ -447,17 +412,16 @@
 
       var rows = (res && res.data) || [];
       if (!rows.length) {
-        // Empty database — fall back to demo products so the site is not blank
         state.products = DEMO_PRODUCTS.slice();
       } else {
-        state.products = rows.map(normalizeProduct);
+        state.products = rows.map(normalizeProduct).filter(Boolean);
       }
     } catch (e) {
       state.products = DEMO_PRODUCTS.slice();
     }
   }
 
-  function normalizeProduct(p){
+  function normalizeProduct(p) {
     if (!p) return null;
     return {
       id: Number(p.id) || 0,
@@ -475,8 +439,7 @@
     };
   }
 
-  // All images of a product (main first, then additional)
-  function productImages(p){
+  function productImages(p) {
     if (!p) return [];
     var imgs = [];
     if (p.main_image) imgs.push(p.main_image);
@@ -489,22 +452,19 @@
   }
 
   /* ==========================================================================
-     7. BUILD CATEGORY STRIP
+     7. CATEGORY STRIP
      ========================================================================== */
-
-  function buildCategories(){
+  function buildCategories() {
     var set = {};
     state.products.forEach(function (p) {
       if (p.category) set[p.category] = true;
     });
-    var cats = Object.keys(set).sort(function (a, b) {
-      return a.localeCompare(b);
-    });
+    var cats = Object.keys(set).sort(function (a, b) { return a.localeCompare(b); });
     state.categories = ['All'].concat(cats);
     renderCategoryStrip();
   }
 
-  function renderCategoryStrip(){
+  function renderCategoryStrip() {
     var wrap = el('categoryStripInner');
     var root = el('categoryStrip');
     if (!wrap || !root) return;
@@ -526,17 +486,14 @@
   }
 
   /* ==========================================================================
-     8. RENDER PRODUCT GRID
+     8. PRODUCT GRID
      ========================================================================== */
-
-  function applyFilters(){
+  function applyFilters() {
     var term = (state.searchTerm || '').trim().toLowerCase();
     var cat = state.activeCategory || 'All';
 
     state.filtered = state.products.filter(function (p) {
-      // Category
       if (cat !== 'All' && p.category !== cat) return false;
-      // Search term
       if (!term) return true;
       var hay = (
         p.name + ' ' +
@@ -550,7 +507,7 @@
     renderGrid();
   }
 
-  function renderGrid(){
+  function renderGrid() {
     var grid = el('productGrid');
     var emptyBox = el('emptyBox');
     var showing = el('showingCount');
@@ -561,7 +518,6 @@
 
     var list = state.filtered;
 
-    // Update showing count
     if (showing) {
       var count = list.length;
       showing.textContent = 'Showing ' + count + ' ' + (count === 1 ? 'bangle' : 'bangles');
@@ -614,7 +570,6 @@
 
     grid.innerHTML = html;
 
-    // Attach click handlers to "View Details" and to the card itself
     Array.prototype.forEach.call(grid.querySelectorAll('[data-open]'), function (btn) {
       btn.addEventListener('click', function (ev) {
         ev.stopPropagation();
@@ -634,15 +589,13 @@
   /* ==========================================================================
      9. SEARCH + LIVE SUGGESTIONS
      ========================================================================== */
-
-  function setupSearch(){
+  function setupSearch() {
     var form  = el('searchForm');
     var input = el('searchInput');
     var clear = el('searchClear');
     var sugg  = el('searchSuggest');
     if (!input || !form) return;
 
-    // Input handler with debounce for suggestions
     var debouncedSuggest = debounce(function () {
       renderSuggestions(input.value);
     }, 200);
@@ -656,7 +609,6 @@
       if (input.value.trim()) renderSuggestions(input.value);
     });
 
-    // Keyboard nav
     input.addEventListener('keydown', function (e) {
       if (!sugg || sugg.hidden) {
         if (e.key === 'Enter') {
@@ -665,13 +617,9 @@
         }
         return;
       }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        moveSuggest(1);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        moveSuggest(-1);
-      } else if (e.key === 'Enter') {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveSuggest(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moveSuggest(-1); }
+      else if (e.key === 'Enter') {
         e.preventDefault();
         if (state.suggestIndex >= 0 && state.suggestItems[state.suggestIndex]) {
           var item = state.suggestItems[state.suggestIndex];
@@ -685,7 +633,6 @@
       }
     });
 
-    // Submit
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       submitSearch(input.value);
@@ -700,7 +647,6 @@
       });
     }
 
-    // Click outside closes suggestions
     document.addEventListener('click', function (e) {
       if (!sugg || sugg.hidden) return;
       var sw = el('searchWrap');
@@ -708,9 +654,8 @@
     });
   }
 
-  function submitSearch(term){
+  function submitSearch(term) {
     state.searchTerm = String(term || '').trim();
-    // When searching, switch back to "All" so results are not hidden by a category
     state.activeCategory = 'All';
     renderCategoryStrip();
     applyFilters();
@@ -718,33 +663,25 @@
     scrollToCollections();
   }
 
-  function scrollToCollections(){
+  function scrollToCollections() {
     var target = el('collections');
     if (!target) return;
-    try {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (e) {
-      target.scrollIntoView();
-    }
+    try { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    catch (e) { target.scrollIntoView(); }
   }
 
-  function renderSuggestions(q){
+  function renderSuggestions(q) {
     var wrap = el('searchSuggest');
     var input = el('searchInput');
     if (!wrap) return;
 
     var term = String(q || '').trim().toLowerCase();
-    if (!term) {
-      closeSuggestions();
-      return;
-    }
+    if (!term) { closeSuggestions(); return; }
 
     var matches = state.products.filter(function (p) {
       var hay = (
-        p.name + ' ' +
-        p.category + ' ' +
-        (p.description || '') + ' ' +
-        productCode(p.id)
+        p.name + ' ' + p.category + ' ' +
+        (p.description || '') + ' ' + productCode(p.id)
       ).toLowerCase();
       return hay.indexOf(term) !== -1;
     }).slice(0, 6);
@@ -795,14 +732,14 @@
     });
   }
 
-  function moveSuggest(dir){
+  function moveSuggest(dir) {
     if (!state.suggestItems.length) return;
     var n = state.suggestItems.length;
     state.suggestIndex = (state.suggestIndex + dir + n) % n;
     highlightSuggestion();
   }
 
-  function highlightSuggestion(){
+  function highlightSuggestion() {
     var wrap = el('searchSuggest');
     if (!wrap) return;
     var items = wrap.querySelectorAll('.suggest-item');
@@ -812,7 +749,7 @@
     });
   }
 
-  function closeSuggestions(){
+  function closeSuggestions() {
     var wrap = el('searchSuggest');
     var input = el('searchInput');
     if (wrap) { wrap.hidden = true; wrap.innerHTML = ''; }
@@ -824,16 +761,15 @@
   /* ==========================================================================
      10. PRODUCT MODAL
      ========================================================================== */
-
   var lastFocusedBeforeModal = null;
 
-  function openProductById(id){
+  function openProductById(id) {
     var product = state.products.find(function (p) { return Number(p.id) === Number(id); });
     if (!product) return;
     openProduct(product);
   }
 
-  function openProduct(product){
+  function openProduct(product) {
     if (!product) return;
 
     state.currentProduct = product;
@@ -844,8 +780,9 @@
     state.myReview = null;
     state.editingReview = false;
     state.reviewSort = 'newest';
+    state.pickerRating = 0;
+    clearReviewFile();
 
-    // Update the URL hash so the popup can be shared
     try {
       var newHash = '#product=' + productCode(product.id);
       if (window.location.hash !== newHash) {
@@ -853,44 +790,28 @@
       }
     } catch (e) { /* ignore */ }
 
-    // Populate basic fields
     var codeEl = el('modalCode');   if (codeEl) codeEl.textContent = productCode(product.id);
     var titleEl = el('modalTitle'); if (titleEl) titleEl.textContent = product.name;
     var descEl = el('modalDesc');   if (descEl) descEl.textContent = product.description || '';
 
-    // Rating badge (hidden until reviews load)
     var ratingBtn = el('modalRating'); if (ratingBtn) ratingBtn.hidden = true;
 
-    // Price block
     renderModalPrice(product);
-
-    // Gallery
     renderGallery(product);
-
-    // Sizes
     renderSizes(product);
-
-    // WhatsApp link
     updateModalWhatsApp();
-
-    // Detail rows (policies + basic info)
     renderDetailRows(product);
-
-    // Tabs: start on Details
     switchTab('details');
 
-    // Reviews will load asynchronously
     loadReviewsForProduct(product.id).then(function () {
       renderReviewsForProduct(product.id);
     });
 
-    // Show the modal
     var modal = el('productModal');
     if (modal) {
       lastFocusedBeforeModal = document.activeElement;
       modal.hidden = false;
       document.body.classList.add('no-scroll');
-      // Focus the close button for keyboard users
       setTimeout(function () {
         var c = el('modalClose');
         if (c) try { c.focus(); } catch (e) {}
@@ -898,14 +819,13 @@
     }
   }
 
-  function closeProductModal(){
+  function closeProductModal() {
     var modal = el('productModal');
     if (!modal) return;
     modal.hidden = true;
     document.body.classList.remove('no-scroll');
     state.currentProduct = null;
 
-    // Clear the hash if it was pointing at a product
     try {
       if (window.location.hash && window.location.hash.indexOf('#product=') === 0) {
         history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -917,7 +837,7 @@
     }
   }
 
-  function renderModalPrice(p){
+  function renderModalPrice(p) {
     var wrap = el('modalPrice');
     if (!wrap) return;
     var off = discountPct(p.price, p.old_price);
@@ -929,7 +849,7 @@
     wrap.innerHTML = html;
   }
 
-  function renderGallery(p){
+  function renderGallery(p) {
     var mainImg = el('galleryMainImg');
     var ph      = el('galleryPlaceholder');
     var badge   = el('galleryBadge');
@@ -949,7 +869,6 @@
       if (ph) ph.hidden = false;
     }
 
-    // Off badge
     var off = discountPct(p.price, p.old_price);
     if (badge) {
       if (off > 0) {
@@ -960,7 +879,6 @@
       }
     }
 
-    // Thumbs
     if (thumbs) {
       if (imgs.length > 1) {
         var html = '';
@@ -986,7 +904,7 @@
     }
   }
 
-  function setGalleryImage(idx){
+  function setGalleryImage(idx) {
     var imgs = state.galleryImages;
     if (!imgs.length) return;
     if (idx < 0) idx = 0;
@@ -994,10 +912,7 @@
     state.currentImageIndex = idx;
 
     var mainImg = el('galleryMainImg');
-    if (mainImg) {
-      mainImg.src = imgs[idx];
-      mainImg.hidden = false;
-    }
+    if (mainImg) { mainImg.src = imgs[idx]; mainImg.hidden = false; }
     var ph = el('galleryPlaceholder');
     if (ph) ph.hidden = true;
 
@@ -1010,7 +925,7 @@
     }
   }
 
-  function renderSizes(p){
+  function renderSizes(p) {
     var wrap = el('modalSizes');
     var section = el('modalSizesWrap');
     if (!wrap || !section) return;
@@ -1024,7 +939,7 @@
     section.hidden = false;
 
     var html = '';
-    sizes.forEach(function (s, i) {
+    sizes.forEach(function (s) {
       html += '<button type="button" class="size-chip" role="radio" aria-checked="false" data-size="' +
               escAttr(s) + '">' + esc(s) + '</button>';
     });
@@ -1043,7 +958,6 @@
       });
     });
 
-    // Auto-select first size
     var first = wrap.querySelector('.size-chip');
     if (first) {
       first.classList.add('is-active');
@@ -1052,7 +966,7 @@
     }
   }
 
-  function updateModalWhatsApp(){
+  function updateModalWhatsApp() {
     var link = el('modalWhatsApp');
     var p = state.currentProduct;
     if (!link || !p) return;
@@ -1068,7 +982,7 @@
     link.href = waLink(num, msg);
   }
 
-  function renderDetailRows(p){
+  function renderDetailRows(p) {
     var wrap = el('detailRows');
     if (!wrap) return;
 
@@ -1092,7 +1006,7 @@
     wrap.innerHTML = html;
   }
 
-  function switchTab(name){
+  function switchTab(name) {
     var details = el('tabDetails');
     var reviews = el('tabReviews');
     var btnD = el('tabBtnDetails');
@@ -1110,11 +1024,10 @@
     }
   }
 
-  function setupModal(){
+  function setupModal() {
     var modal = el('productModal');
     if (!modal) return;
 
-    // Close buttons
     var closeBtn = el('modalClose');
     if (closeBtn) closeBtn.addEventListener('click', closeProductModal);
 
@@ -1122,21 +1035,20 @@
       b.addEventListener('click', closeProductModal);
     });
 
-    // Escape closes modal (but not if lightbox is open)
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
       var lb = el('lightbox');
       if (lb && !lb.hidden) { closeLightbox(); return; }
+      // Let VionaAuth modals close themselves first.
+      if (document.querySelector('.va-backdrop:not([hidden])')) return;
       if (!modal.hidden) closeProductModal();
     });
 
-    // Tabs
     var btnD = el('tabBtnDetails');
     var btnR = el('tabBtnReviews');
     if (btnD) btnD.addEventListener('click', function () { switchTab('details'); });
     if (btnR) btnR.addEventListener('click', function () { switchTab('reviews'); });
 
-    // Rating button jumps to reviews
     var ratingBtn = el('modalRating');
     if (ratingBtn) {
       ratingBtn.addEventListener('click', function () {
@@ -1150,15 +1062,13 @@
   /* ==========================================================================
      11. DEEP LINK
      ========================================================================== */
-
-  function handleDeepLink(){
+  function handleDeepLink() {
     if (!window.location.hash) return;
     var m = window.location.hash.match(/#product=([A-Za-z0-9\-]+)/);
     if (!m) return;
     var id = codeToId(m[1]);
     if (!id) return;
 
-    // Wait for products to be ready (they load asynchronously)
     var tries = 0;
     var iv = setInterval(function () {
       tries++;
@@ -1175,9 +1085,8 @@
   /* ==========================================================================
      12. FAQ
      ========================================================================== */
-
-  async function loadFaqs(){
-    if (!SUPABASE_READY) {
+  async function loadFaqs() {
+    if (!SUPABASE_READY || !sb) {
       state.faqs = DEMO_FAQS.slice();
       return;
     }
@@ -1197,13 +1106,10 @@
     }
   }
 
-  function renderFaqs(){
+  function renderFaqs() {
     var wrap = el('faqList');
     if (!wrap) return;
-    if (!state.faqs.length) {
-      wrap.innerHTML = '';
-      return;
-    }
+    if (!state.faqs.length) { wrap.innerHTML = ''; return; }
 
     var html = '';
     state.faqs.forEach(function (f, i) {
@@ -1222,7 +1128,6 @@
       if (!btn) return;
       btn.addEventListener('click', function () {
         var open = item.classList.contains('is-open');
-        // Close all
         Array.prototype.forEach.call(wrap.querySelectorAll('.faq-item'), function (other) {
           other.classList.remove('is-open');
           var b = other.querySelector('.faq-q');
@@ -1239,10 +1144,9 @@
   /* ==========================================================================
      13. OFFERS — STRIP / BANNER / POPUP
      ========================================================================== */
-
-  async function loadOffers(){
+  async function loadOffers() {
     state.offers = { strips: [], banners: [], popups: [] };
-    if (!SUPABASE_READY) return;
+    if (!SUPABASE_READY || !sb) return;
 
     try {
       var res = await sb
@@ -1257,7 +1161,6 @@
       var now = new Date();
 
       rows.forEach(function (o) {
-        // Additional client-side date check (RLS already filters, but be safe)
         if (o.starts_at) {
           var s = new Date(o.starts_at);
           if (!isNaN(s.getTime()) && s > now) return;
@@ -1270,12 +1173,10 @@
         else if (o.display_type === 'banner') state.offers.banners.push(o);
         else if (o.display_type === 'popup')  state.offers.popups.push(o);
       });
-    } catch (e) {
-      // Silently ignore — no offers section will appear
-    }
+    } catch (e) { /* ignore */ }
   }
 
-  function offerBackground(o){
+  function offerBackground(o) {
     if (o.bg_image) {
       return 'background-image:linear-gradient(rgba(10,16,34,.18),rgba(10,16,34,.28)),url(' +
              '&quot;' + escAttr(o.bg_image) + '&quot;);';
@@ -1287,15 +1188,14 @@
     return 'background-color:' + escAttr(o.bg_color || '#14224A') + ';';
   }
 
-  function offerStyleAttrs(o){
+  function offerStyleAttrs(o) {
     var s = offerBackground(o);
     s += 'color:' + escAttr(o.text_color || '#FFFFFF') + ';';
     return s;
   }
 
-  /* -------- STRIP -------------------------------------------------------- */
-
-  function renderStrips(){
+  /* -------- STRIP -------- */
+  function renderStrips() {
     var root = el('offerStripRoot');
     if (!root) return;
     var list = state.offers.strips;
@@ -1303,10 +1203,7 @@
     if (!list.length) {
       root.innerHTML = '';
       root.hidden = true;
-      if (state.stripTimer) {
-        clearInterval(state.stripTimer);
-        state.stripTimer = null;
-      }
+      if (state.stripTimer) { clearInterval(state.stripTimer); state.stripTimer = null; }
       return;
     }
 
@@ -1324,7 +1221,7 @@
     }
   }
 
-  function renderStripAt(idx){
+  function renderStripAt(idx) {
     var root = el('offerStripRoot');
     if (!root) return;
     var list = state.strips;
@@ -1354,9 +1251,8 @@
     }
   }
 
-  /* -------- BANNER ------------------------------------------------------- */
-
-  function renderBanners(){
+  /* -------- BANNER -------- */
+  function renderBanners() {
     var section = el('bannerSection');
     var track = el('bannerTrack');
     var dotsWrap = el('bannerDots');
@@ -1399,7 +1295,6 @@
     });
     track.innerHTML = html;
 
-    // Dots
     var dotsHtml = '';
     list.forEach(function (o, i) {
       dotsHtml += '<button type="button" class="banner-dot' + (i === 0 ? ' is-active' : '') +
@@ -1429,7 +1324,6 @@
       restartBannerAutoplay();
     };
 
-    // Swipe support
     var startX = 0;
     var moved = false;
     track.addEventListener('touchstart', function (e) {
@@ -1437,9 +1331,7 @@
       startX = e.touches[0].clientX;
       moved = false;
     }, { passive: true });
-    track.addEventListener('touchmove', function () {
-      moved = true;
-    }, { passive: true });
+    track.addEventListener('touchmove', function () { moved = true; }, { passive: true });
     track.addEventListener('touchend', function (e) {
       if (!moved) return;
       var endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : startX;
@@ -1451,11 +1343,10 @@
       restartBannerAutoplay();
     });
 
-    // Autoplay
     restartBannerAutoplay();
   }
 
-  function updateBannerPosition(){
+  function updateBannerPosition() {
     var track = el('bannerTrack');
     var dotsWrap = el('bannerDots');
     if (!track) return;
@@ -1469,7 +1360,7 @@
     }
   }
 
-  function restartBannerAutoplay(){
+  function restartBannerAutoplay() {
     if (state.bannerTimer) clearInterval(state.bannerTimer);
     var list = state.offers.banners;
     if (list.length < 2) return;
@@ -1479,9 +1370,8 @@
     }, 5000);
   }
 
-  /* -------- POPUP -------------------------------------------------------- */
-
-  function renderPopup(){
+  /* -------- POPUP -------- */
+  function renderPopup() {
     var root = el('popupRoot');
     if (!root) return;
     root.innerHTML = '';
@@ -1489,7 +1379,6 @@
     var list = state.offers.popups;
     if (!list.length) return;
 
-    // Find the first one we have not shown in this browser session
     var chosen = null;
     for (var i = 0; i < list.length; i++) {
       var key = 'viona_popup_' + list[i].id;
@@ -1497,16 +1386,13 @@
     }
     if (!chosen) return;
 
-    setTimeout(function () {
-      showPopup(chosen);
-    }, 2000);
+    setTimeout(function () { showPopup(chosen); }, 2000);
   }
 
-  function showPopup(o){
+  function showPopup(o) {
     var root = el('popupRoot');
     if (!root) return;
 
-    // Mark as shown for this session
     sessionSet('viona_popup_' + o.id, '1');
 
     var align = (o.text_align === 'left' || o.text_align === 'right') ? o.text_align : 'center';
@@ -1534,51 +1420,48 @@
       '</div>';
 
     Array.prototype.forEach.call(root.querySelectorAll('[data-popup-close]'), function (b) {
-      b.addEventListener('click', function () {
-        root.innerHTML = '';
-      });
+      b.addEventListener('click', function () { root.innerHTML = ''; });
     });
   }
 
   /* ==========================================================================
      14. REVIEWS
+     --------------------------------------------------------------------------
+     Uses VionaAuth for authentication. Reviews table columns we use:
+       id, product_id, user_id, customer_name, rating, comment, image_url, created_at
+     Photo bucket: "review-images" (uploads go to {user_id}/{timestamp}.jpg)
      ========================================================================== */
 
-  async function getCurrentUser(){
-    if (!SUPABASE_READY) return null;
-    try {
-      var res = await sb.auth.getUser();
-      if (res && res.data && res.data.user) return res.data.user;
-    } catch (e) { /* ignore */ }
-    return null;
+  function currentUserName() {
+    var user = state.currentUser;
+    if (!user) return '';
+    var p = state.currentProfile || {};
+    var meta = user.user_metadata || {};
+    return String(p.name || meta.full_name || meta.name || user.email || 'Viona Customer').trim();
   }
 
-  function listenAuthChanges(){
-    if (!SUPABASE_READY) return;
+  async function refreshCurrentProfile() {
+    if (!window.VionaAuth) return;
+    state.currentProfile = window.VionaAuth.getProfile();
+    if (state.currentProfile) return;
+    // Profile not loaded yet — wait one tick.
     try {
-      sb.auth.onAuthStateChange(function (_event, session) {
-        state.currentUser = (session && session.user) ? session.user : null;
-        // If a product modal is open, refresh its review UI
-        if (state.currentProduct) {
-          renderUserChip();
-          loadReviewsForProduct(state.currentProduct.id).then(function () {
-            renderReviewsForProduct(state.currentProduct.id);
-          });
-        }
-      });
+      // Small wait so auth.js can finish its initial fetch.
+      await new Promise(function (r) { setTimeout(r, 200); });
+      state.currentProfile = window.VionaAuth.getProfile();
     } catch (e) { /* ignore */ }
   }
 
-  async function loadReviewsForProduct(productId){
+  async function loadReviewsForProduct(productId) {
     state.reviews = [];
     state.myReview = null;
 
-    if (!SUPABASE_READY) return;
+    if (!SUPABASE_READY || !sb) return;
 
     try {
       var res = await sb
         .from('reviews')
-        .select('id,product_id,user_id,user_name,user_avatar,rating,title,comment,images,approved,created_at')
+        .select('id,product_id,user_id,customer_name,rating,comment,image_url,created_at')
         .eq('product_id', productId)
         .order('created_at', { ascending: false });
 
@@ -1587,24 +1470,21 @@
       var rows = (res && res.data) || [];
       var uid = state.currentUser ? state.currentUser.id : null;
 
-      // Split approved vs my own (unapproved)
-      var approved = [];
+      var visible = [];
       rows.forEach(function (r) {
-        if (r.approved) {
-          approved.push(r);
-        }
         if (uid && r.user_id === uid) {
           state.myReview = r;
         }
+        visible.push(r);
       });
-      state.reviews = approved;
+      state.reviews = visible;
     } catch (e) {
       state.reviews = [];
       state.myReview = null;
     }
   }
 
-  function computeReviewStats(){
+  function computeReviewStats() {
     var stats = { 5:0, 4:0, 3:0, 2:0, 1:0 };
     var sum = 0, n = 0;
     state.reviews.forEach(function (r) {
@@ -1618,7 +1498,7 @@
     return { stats: stats, total: n, average: avg };
   }
 
-  function renderReviewsForProduct(productId){
+  function renderReviewsForProduct(productId) {
     updateTabReviewCount();
     renderReviewSummary();
     renderReviewList();
@@ -1628,33 +1508,28 @@
     updateCardRatings();
   }
 
-  function updateTabReviewCount(){
+  function updateTabReviewCount() {
     var span = el('tabReviewCount');
     if (!span) return;
     var total = state.reviews.length;
     span.textContent = total ? '(' + total + ')' : '';
   }
 
-  function updateModalRatingBadge(){
+  function updateModalRatingBadge() {
     var btn = el('modalRating');
     var stars = el('modalStars');
     var text = el('modalRatingText');
     if (!btn || !stars || !text) return;
 
     var stats = computeReviewStats();
-    if (!stats.total) {
-      btn.hidden = true;
-      return;
-    }
+    if (!stats.total) { btn.hidden = true; return; }
     stars.innerHTML = starsHtml(stats.average);
     text.textContent = stats.average.toFixed(1) + ' · ' + stats.total + ' ' +
                        (stats.total === 1 ? 'review' : 'reviews');
     btn.hidden = false;
   }
 
-  function updateCardRatings(){
-    // Card ratings are shown only for the current product's card while its
-    // reviews are loaded — the grid refreshes with averages on next render.
+  function updateCardRatings() {
     var grid = el('productGrid');
     if (!grid || !state.currentProduct) return;
     var stats = computeReviewStats();
@@ -1674,7 +1549,7 @@
     }
   }
 
-  function renderReviewSummary(){
+  function renderReviewSummary() {
     var wrap = el('reviewsSummary');
     if (!wrap) return;
 
@@ -1706,7 +1581,7 @@
     barsWrap.innerHTML = html;
   }
 
-  function renderReviewList(){
+  function renderReviewList() {
     var wrap = el('reviewsList');
     var empty = el('reviewsEmpty');
     var toolbar = el('reviewsToolbar');
@@ -1714,7 +1589,6 @@
 
     var list = state.reviews.slice();
 
-    // Sorting
     if (state.reviewSort === 'highest') {
       list.sort(function (a, b) { return (b.rating - a.rating) || (new Date(b.created_at) - new Date(a.created_at)); });
     } else if (state.reviewSort === 'lowest') {
@@ -1723,13 +1597,9 @@
       list.sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
     }
 
-    // Show my own review at the top (with "Pending" tag if not approved)
-    var myHtml = '';
-    if (state.myReview) {
-      myHtml = renderReviewCard(state.myReview, true);
-    }
+    var myId = state.myReview ? state.myReview.id : null;
 
-    if (!list.length && !state.myReview) {
+    if (!list.length) {
       wrap.innerHTML = '';
       if (empty) empty.hidden = false;
       if (toolbar) toolbar.hidden = true;
@@ -1738,63 +1608,53 @@
     if (empty) empty.hidden = true;
     if (toolbar) toolbar.hidden = list.length < 2;
 
-    var html = myHtml;
+    var html = '';
     list.forEach(function (r) {
-      // Skip my own if it is already shown and approved
-      if (state.myReview && r.id === state.myReview.id) return;
-      html += renderReviewCard(r, false);
+      var isOwn = (myId != null && r.id === myId);
+      html += renderReviewCard(r, isOwn);
     });
     wrap.innerHTML = html;
 
-    // Attach action handlers (Edit / Delete on own review)
     Array.prototype.forEach.call(wrap.querySelectorAll('[data-review-edit]'), function (b) {
       b.addEventListener('click', function () {
         state.editingReview = true;
         renderReviewFormOrCTA();
+        var f = el('reviewFormWrap');
+        if (f) try { f.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
       });
     });
     Array.prototype.forEach.call(wrap.querySelectorAll('[data-review-delete]'), function (b) {
-      b.addEventListener('click', function () {
-        deleteMyReview();
-      });
+      b.addEventListener('click', function () { deleteMyReview(); });
     });
 
-    // Photo thumbnails -> lightbox
     Array.prototype.forEach.call(wrap.querySelectorAll('[data-review-photo]'), function (b) {
       b.addEventListener('click', function () {
         var pid = Number(b.getAttribute('data-review-id'));
-        var idx = Number(b.getAttribute('data-photo-idx'));
-        openReviewLightbox(pid, idx);
+        openReviewLightbox(pid);
       });
     });
   }
 
-  function renderReviewCard(r, isOwn){
-    var name = r.user_name || 'Viona Customer';
+  function renderReviewCard(r, isOwn) {
+    var name = r.customer_name || 'Viona Customer';
     var initial = name.trim().charAt(0).toUpperCase() || 'V';
-    var avatar = r.user_avatar
-      ? '<img class="review-avatar" src="' + escAttr(r.user_avatar) + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.hidden=false;" /><span class="review-letter" hidden>' + esc(initial) + '</span>'
-      : '<span class="review-letter">' + esc(initial) + '</span>';
 
-    var titleHtml = r.title ? '<p class="review-title">' + esc(r.title) + '</p>' : '';
+    var avatar =
+      '<span class="review-letter">' + esc(initial) + '</span>';
 
-    var tagHtml = '';
-    if (isOwn && !r.approved) {
-      tagHtml = '<span class="review-tag">Pending approval</span>';
-    }
+    var tagHtml = isOwn
+      ? '<span class="review-tag">Your review</span>'
+      : '';
 
     var photosHtml = '';
-    if (Array.isArray(r.images) && r.images.length) {
-      photosHtml = '<div class="review-photos">';
-      r.images.forEach(function (u, i) {
-        if (!u) return;
-        photosHtml +=
-          '<button type="button" class="review-photo" data-review-photo data-review-id="' + escAttr(String(r.id)) +
-          '" data-photo-idx="' + i + '" aria-label="Open photo ' + (i + 1) + '">' +
-            '<img src="' + escAttr(u) + '" alt="" loading="lazy" />' +
-          '</button>';
-      });
-      photosHtml += '</div>';
+    if (r.image_url) {
+      photosHtml =
+        '<div class="review-photos">' +
+          '<button type="button" class="review-photo" data-review-photo data-review-id="' +
+            escAttr(String(r.id)) + '" aria-label="Open photo">' +
+            '<img src="' + escAttr(r.image_url) + '" alt="" loading="lazy" />' +
+          '</button>' +
+        '</div>';
     }
 
     var actionsHtml = '';
@@ -1817,14 +1677,13 @@
         '</div>' +
         '<div class="review-stars stars">' + starsHtml(r.rating) + '</div>' +
         tagHtml +
-        titleHtml +
         '<p class="review-text">' + esc(r.comment || '') + '</p>' +
         photosHtml +
         actionsHtml +
       '</article>';
   }
 
-  function renderUserChip(){
+  function renderUserChip() {
     var chip = el('userChip');
     var avatar = el('userChipAvatar');
     var letter = el('userChipLetter');
@@ -1833,14 +1692,11 @@
     if (!chip || !avatar || !letter || !nameEl || !signOut) return;
 
     var u = state.currentUser;
-    if (!u) {
-      chip.hidden = true;
-      return;
-    }
+    if (!u) { chip.hidden = true; return; }
     chip.hidden = false;
 
     var meta = u.user_metadata || {};
-    var display = meta.full_name || meta.name || u.email || 'Signed in';
+    var display = currentUserName() || u.email || 'Signed in';
     var pic = meta.avatar_url || meta.picture || '';
 
     nameEl.textContent = display;
@@ -1856,58 +1712,54 @@
       letter.hidden = false;
     }
 
-    signOut.onclick = async function () {
-      try {
-        await sb.auth.signOut();
-        toast('Signed out');
-      } catch (e) {
-        toast('Could not sign out');
-      }
+    signOut.onclick = function () {
+      if (window.VionaAuth) window.VionaAuth.logout();
     };
   }
 
-  function renderReviewFormOrCTA(){
+  function renderReviewFormOrCTA() {
     var wrap = el('reviewFormWrap');
     if (!wrap) return;
 
-    // Not signed in -> CTA
+    // Not signed in -> CTA that opens the shared login modal.
     if (!state.currentUser) {
       wrap.innerHTML =
         '<div class="review-cta">' +
           '<p class="review-cta-title">Share your experience</p>' +
-          '<p class="review-cta-text">Sign in with Google to write a review. It only takes a minute.</p>' +
-          '<button type="button" class="btn btn-gold" id="ctaSignIn">Sign in with Google</button>' +
+          '<p class="review-cta-text">Login or create an account to write a review. It only takes a minute.</p>' +
+          '<button type="button" class="btn btn-gold" id="ctaLoginBtn">Login to write a review</button>' +
         '</div>';
 
-      var btn = el('ctaSignIn');
-      if (btn) btn.addEventListener('click', signInWithGoogle);
+      var ctaBtn = el('ctaLoginBtn');
+      if (ctaBtn) {
+        ctaBtn.addEventListener('click', function () {
+          if (window.VionaAuth) window.VionaAuth.openLogin();
+        });
+      }
       return;
     }
 
-    // Signed in and already has a review (and NOT editing) -> nothing extra
+    // Signed in and already has a review (not editing) -> nothing extra.
     if (state.myReview && !state.editingReview) {
       wrap.innerHTML = '';
       return;
     }
 
-    // Signed in -> show form (new or edit)
     var r = state.myReview || {};
     var isEdit = !!state.myReview;
+    var initialRating = Number(r.rating) || 0;
+    state.pickerRating = initialRating;
 
     wrap.innerHTML =
       '<div class="review-form">' +
         '<p class="review-form-title">' + (isEdit ? 'Edit your review' : 'Write a review') + '</p>' +
-        '<p class="review-form-sub">Your review appears after approval.</p>' +
+        '<p class="review-form-sub">Your feedback helps other shoppers.</p>' +
         '<div class="form-field">' +
           '<label>Your rating</label>' +
           '<div class="star-picker" id="starPicker" role="radiogroup" aria-label="Rating">' +
-            starPickerHtml(Number(r.rating) || 0) +
+            starPickerHtml(initialRating) +
           '</div>' +
-          '<p class="form-hint" id="starHint">' + (r.rating ? (r.rating + ' of 5') : 'Tap a star to rate') + '</p>' +
-        '</div>' +
-        '<div class="form-field">' +
-          '<label for="reviewTitleInput">Title (optional)</label>' +
-          '<input id="reviewTitleInput" class="form-input" type="text" maxlength="80" placeholder="A short headline" value="' + escAttr(r.title || '') + '" />' +
+          '<p class="form-hint" id="starHint">' + (initialRating ? (initialRating + ' of 5') : 'Tap a star to rate') + '</p>' +
         '</div>' +
         '<div class="form-field">' +
           '<label for="reviewCommentInput">Your review *</label>' +
@@ -1915,9 +1767,9 @@
           '<p class="form-hint">10 to 1000 characters.</p>' +
         '</div>' +
         '<div class="form-field">' +
-          '<label>Add photos (optional, up to 3)</label>' +
+          '<label>Add a photo (optional)</label>' +
           '<div class="photo-picker" id="photoPicker"></div>' +
-          '<input id="reviewPhotoInput" type="file" accept="image/*" multiple hidden />' +
+          '<input id="reviewPhotoInput" type="file" accept="image/*" hidden />' +
         '</div>' +
         '<p class="form-error" id="reviewFormError" hidden></p>' +
         '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
@@ -1926,12 +1778,20 @@
         '</div>' +
       '</div>';
 
+    // Pre-fill the photo picker with the existing image_url (if any).
+    if (r.image_url) {
+      state.reviewFile = null; // no pending upload
+      state.reviewPreviewUrl = ''; // not created by us
+    } else {
+      clearReviewFile();
+    }
+
     setupStarPicker();
-    setupPhotoPicker();
+    setupPhotoPicker(r.image_url || '');
     setupReviewSubmit();
   }
 
-  function starPickerHtml(rating){
+  function starPickerHtml(rating) {
     var html = '';
     for (var i = 1; i <= 5; i++) {
       html += '<button type="button" class="star-pick' + (i <= rating ? ' is-on' : '') +
@@ -1941,18 +1801,12 @@
     return html;
   }
 
-  function setupStarPicker(){
+  function setupStarPicker() {
     var wrap = el('starPicker');
     var hint = el('starHint');
     if (!wrap) return;
 
-    var current = 0;
-    Array.prototype.forEach.call(wrap.querySelectorAll('.star-pick'), function (b, i) {
-      if (b.classList.contains('is-on')) current = Math.max(current, i + 1);
-    });
-    state._pickerRating = current;
-
-    function paint(n){
+    function paint(n) {
       Array.prototype.forEach.call(wrap.querySelectorAll('.star-pick'), function (b, i) {
         if (i < n) b.classList.add('is-on');
         else b.classList.remove('is-on');
@@ -1966,49 +1820,59 @@
         paint(Number(b.getAttribute('data-star')));
       });
       b.addEventListener('click', function () {
-        state._pickerRating = Number(b.getAttribute('data-star'));
-        paint(state._pickerRating);
+        state.pickerRating = Number(b.getAttribute('data-star'));
+        paint(state.pickerRating);
       });
       b.addEventListener('keydown', function (e) {
         if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
           e.preventDefault();
-          state._pickerRating = Math.min(5, (state._pickerRating || 0) + 1);
-          paint(state._pickerRating);
+          state.pickerRating = Math.min(5, (state.pickerRating || 0) + 1);
+          paint(state.pickerRating);
         } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
           e.preventDefault();
-          state._pickerRating = Math.max(1, (state._pickerRating || 1) - 1);
-          paint(state._pickerRating);
+          state.pickerRating = Math.max(1, (state.pickerRating || 1) - 1);
+          paint(state.pickerRating);
         } else if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          state._pickerRating = Number(b.getAttribute('data-star'));
-          paint(state._pickerRating);
+          state.pickerRating = Number(b.getAttribute('data-star'));
+          paint(state.pickerRating);
         }
       });
     });
 
     wrap.addEventListener('mouseleave', function () {
-      paint(state._pickerRating || 0);
+      paint(state.pickerRating || 0);
     });
   }
 
-  function setupPhotoPicker(){
+  function clearReviewFile() {
+    if (state.reviewPreviewUrl) {
+      try { URL.revokeObjectURL(state.reviewPreviewUrl); } catch (e) {}
+    }
+    state.reviewFile = null;
+    state.reviewPreviewUrl = '';
+  }
+
+  function setupPhotoPicker(existingUrl) {
     var picker = el('photoPicker');
     var input = el('reviewPhotoInput');
     if (!picker || !input) return;
 
-    // Local list of picked blobs (not yet uploaded)
-    var files = [];
+    function currentPreview() {
+      if (state.reviewFile && state.reviewFile.preview) return state.reviewFile.preview;
+      return existingUrl || '';
+    }
 
-    function refresh(){
+    function refresh() {
+      var preview = currentPreview();
       var html = '';
-      files.forEach(function (f, i) {
+      if (preview) {
         html +=
           '<div class="photo-thumb">' +
-            '<img src="' + escAttr(f.preview) + '" alt="" />' +
-            '<button type="button" class="photo-remove" data-remove="' + i + '" aria-label="Remove photo">×</button>' +
+            '<img src="' + escAttr(preview) + '" alt="" />' +
+            '<button type="button" class="photo-remove" data-remove="1" aria-label="Remove photo">×</button>' +
           '</div>';
-      });
-      if (files.length < 3) {
+      } else {
         html += '<button type="button" class="photo-add" id="photoAddBtn" aria-label="Add photo">+</button>';
       }
       picker.innerHTML = html;
@@ -2016,45 +1880,48 @@
       var addBtn = el('photoAddBtn');
       if (addBtn) addBtn.addEventListener('click', function () { input.click(); });
 
-      Array.prototype.forEach.call(picker.querySelectorAll('[data-remove]'), function (b) {
-        b.addEventListener('click', function () {
-          var idx = Number(b.getAttribute('data-remove'));
-          var f = files[idx];
-          if (f && f.preview) { try { URL.revokeObjectURL(f.preview); } catch (e) {} }
-          files.splice(idx, 1);
+      var rm = picker.querySelector('[data-remove]');
+      if (rm) {
+        rm.addEventListener('click', function () {
+          clearReviewFile();
+          // Also mark the existing image as removed (handled by submit logic).
+          picker.dataset.removedExisting = '1';
           refresh();
         });
-      });
+      }
     }
 
     input.addEventListener('change', async function () {
-      var list = Array.prototype.slice.call(input.files || []);
-      for (var i = 0; i < list.length; i++) {
-        if (files.length >= 3) break;
-        var file = list[i];
-        if (!file || !/^image\//.test(file.type)) continue;
-        try {
-          var compressed = await compressImage(file, 1200, 0.82);
-          var preview = URL.createObjectURL(compressed);
-          files.push({ blob: compressed, preview: preview });
-        } catch (e) {
-          // Fallback: keep the original
-          try {
-            files.push({ blob: file, preview: URL.createObjectURL(file) });
-          } catch (e2) { /* ignore */ }
-        }
-      }
+      var file = input.files && input.files[0];
       input.value = '';
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { toast('Please choose an image file.'); return; }
+      if (file.size > 8 * 1024 * 1024) { toast('That image is larger than 8 MB.'); return; }
+
+      clearReviewFile();
+
+      try {
+        var blob = await compressImage(file, 1200, 0.82);
+        var preview = URL.createObjectURL(blob);
+        state.reviewFile = { blob: blob, preview: preview };
+        state.reviewPreviewUrl = preview;
+        picker.dataset.removedExisting = '';
+      } catch (e) {
+        // Fallback: use the original file
+        try {
+          state.reviewFile = { blob: file, preview: URL.createObjectURL(file) };
+          state.reviewPreviewUrl = state.reviewFile.preview;
+          picker.dataset.removedExisting = '';
+        } catch (e2) { /* ignore */ }
+      }
       refresh();
     });
 
+    if (!existingUrl) picker.dataset.removedExisting = '';
     refresh();
-
-    // Expose files list on a known place so submit can read it
-    state._reviewFiles = files;
   }
 
-  function setupReviewSubmit(){
+  function setupReviewSubmit() {
     var btn = el('reviewSubmit');
     var cancel = el('reviewCancelEdit');
     var errEl = el('reviewFormError');
@@ -2071,74 +1938,70 @@
     btn.addEventListener('click', async function () {
       if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
 
-      var rating = Number(state._pickerRating) || 0;
-      var titleEl = el('reviewTitleInput');
+      var rating = Number(state.pickerRating) || 0;
       var commentEl = el('reviewCommentInput');
-      var title = titleEl ? titleEl.value.trim().slice(0, 80) : '';
       var comment = commentEl ? commentEl.value.trim() : '';
 
       if (!rating) return showFormError('Please choose a star rating.');
       if (comment.length < 10) return showFormError('Please write at least 10 characters.');
       if (comment.length > 1000) return showFormError('Review is too long (max 1000 characters).');
 
+      var user = state.currentUser;
+      if (!user) return showFormError('You are not signed in.');
+
       btn.disabled = true;
       btn.classList.add('is-loading');
       btn.textContent = 'Saving…';
 
       try {
-        var user = state.currentUser;
-        if (!user) throw new Error('You are not signed in.');
-
-        // Upload photos (if any)
-        var uploadedUrls = [];
-        var files = state._reviewFiles || [];
-        for (var i = 0; i < files.length; i++) {
+        // Decide final image_url:
+        //   - new file picked  -> upload it
+        //   - user removed old -> null
+        //   - else             -> keep state.myReview.image_url
+        var finalImageUrl = null;
+        if (state.reviewFile && state.reviewFile.blob) {
           try {
-            var path = user.id + '/' + Date.now() + '-' + i + '.jpg';
-            var upRes = await sb.storage.from('review-images').upload(path, files[i].blob, {
-              contentType: 'image/jpeg',
-              upsert: false
-            });
-            if (upRes && upRes.error) throw upRes.error;
-            var pub = sb.storage.from('review-images').getPublicUrl(path);
-            if (pub && pub.data && pub.data.publicUrl) uploadedUrls.push(pub.data.publicUrl);
-          } catch (e) {
-            // If one photo fails, continue with the rest
+            finalImageUrl = await uploadReviewImage(user.id, state.reviewFile.blob);
+          } catch (upErr) {
+            // Bucket missing / upload failed -> submit without photo.
+            console.warn('[reviews] photo upload failed:', upErr && upErr.message);
+            finalImageUrl = (state.myReview && state.myReview.image_url) || null;
+          }
+        } else if (state.myReview && state.myReview.image_url) {
+          var picker = el('photoPicker');
+          if (picker && picker.dataset.removedExisting === '1') {
+            finalImageUrl = null;
+          } else {
+            finalImageUrl = state.myReview.image_url;
           }
         }
 
-        var meta = user.user_metadata || {};
+        // Fetch latest customer profile name (best effort).
+        await refreshCurrentProfile();
+        var name = currentUserName() || 'Viona Customer';
+
         var payload = {
           product_id: state.currentProduct.id,
           user_id: user.id,
-          user_name: meta.full_name || meta.name || user.email || 'Viona Customer',
-          user_avatar: meta.avatar_url || meta.picture || '',
+          customer_name: name,
           rating: rating,
-          title: title,
           comment: comment,
-          images: uploadedUrls,
-          approved: false
+          image_url: finalImageUrl
         };
 
-        // Update existing review, or insert a new one
         if (state.myReview && state.myReview.id) {
           var upd = await sb.from('reviews').update(payload).eq('id', state.myReview.id);
           if (upd && upd.error) throw upd.error;
-          toast('Review updated. It will appear after approval.');
+          toast('Review updated.');
         } else {
           var ins = await sb.from('reviews').insert(payload);
           if (ins && ins.error) throw ins.error;
-          toast('Thank you! Your review will appear after approval.');
+          toast('Thank you! Your review is live.');
         }
 
         state.editingReview = false;
-        // Clean up local previews
-        (state._reviewFiles || []).forEach(function (f) {
-          if (f && f.preview) { try { URL.revokeObjectURL(f.preview); } catch (e) {} }
-        });
-        state._reviewFiles = [];
+        clearReviewFile();
 
-        // Reload
         await loadReviewsForProduct(state.currentProduct.id);
         renderReviewsForProduct(state.currentProduct.id);
       } catch (e) {
@@ -2150,14 +2013,26 @@
       }
     });
 
-    function showFormError(msg){
+    function showFormError(msg) {
       if (!errEl) { toast(msg); return; }
       errEl.textContent = msg;
       errEl.hidden = false;
     }
   }
 
-  async function deleteMyReview(){
+  async function uploadReviewImage(userId, blob) {
+    var path = userId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+    var up = await sb.storage.from('review-images').upload(path, blob, {
+      contentType: 'image/jpeg',
+      upsert: false
+    });
+    if (up && up.error) throw up.error;
+    var pub = sb.storage.from('review-images').getPublicUrl(path);
+    if (pub && pub.data && pub.data.publicUrl) return pub.data.publicUrl;
+    throw new Error('No public URL returned.');
+  }
+
+  async function deleteMyReview() {
     if (!state.myReview || !state.myReview.id) return;
     var ok = window.confirm('Delete your review? This cannot be undone.');
     if (!ok) return;
@@ -2172,41 +2047,16 @@
     }
   }
 
-  async function signInWithGoogle(){
-    if (!SUPABASE_READY) {
-      toast('Sign in is not available right now.');
-      return;
-    }
-    try {
-      var redirect = window.location.origin + window.location.pathname;
-      if (state.currentProduct) {
-        redirect += '#product=' + productCode(state.currentProduct.id);
-      }
-      var res = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: redirect }
-      });
-      if (res && res.error) throw res.error;
-    } catch (e) {
-      toast('Could not start Google sign in.');
-    }
-  }
-
-  /* -------- Lightbox ---------------------------------------------------- */
-
-  function openReviewLightbox(reviewId, startIndex){
+  /* -------- Lightbox -------- */
+  function openReviewLightbox(reviewId) {
     var r = state.reviews.find(function (x) { return Number(x.id) === Number(reviewId); });
-    if (!r && state.myReview && Number(state.myReview.id) === Number(reviewId)) {
-      r = state.myReview;
-    }
-    if (!r || !Array.isArray(r.images) || !r.images.length) return;
-
-    state.lightbox.images = r.images.slice();
-    state.lightbox.index = Math.max(0, Math.min(startIndex || 0, r.images.length - 1));
+    if (!r || !r.image_url) return;
+    state.lightbox.images = [r.image_url];
+    state.lightbox.index = 0;
     showLightbox();
   }
 
-  function showLightbox(){
+  function showLightbox() {
     var lb = el('lightbox');
     var img = el('lbImg');
     var counter = el('lbCounter');
@@ -2224,14 +2074,14 @@
     document.body.classList.add('no-scroll');
   }
 
-  function closeLightbox(){
+  function closeLightbox() {
     var lb = el('lightbox');
     if (!lb) return;
     lb.hidden = true;
     if (!state.currentProduct) document.body.classList.remove('no-scroll');
   }
 
-  function setupLightbox(){
+  function setupLightbox() {
     var lb = el('lightbox');
     if (!lb) return;
     var img = el('lbImg');
@@ -2261,7 +2111,6 @@
       if (counter) counter.textContent = (state.lightbox.index + 1) + ' / ' + n;
     });
 
-    // Keyboard
     document.addEventListener('keydown', function (e) {
       if (lb.hidden) return;
       if (e.key === 'ArrowLeft' && prev) prev.click();
@@ -2270,9 +2119,8 @@
     });
   }
 
-  /* -------- Image compression (browser side) ----------------------------- */
-
-  function compressImage(file, maxSide, quality){
+  /* -------- Image compression -------- */
+  function compressImage(file, maxSide, quality) {
     return new Promise(function (resolve, reject) {
       try {
         var reader = new FileReader();
@@ -2308,10 +2156,9 @@
   }
 
   /* ==========================================================================
-     15. CATEGORY STRIP + MENU + MISC EVENTS
+     15. CATEGORY STRIP + MENU + MISC
      ========================================================================== */
-
-  function setupCategoryStrip(){
+  function setupCategoryStrip() {
     var wrap = el('categoryStripInner');
     if (!wrap) return;
 
@@ -2332,7 +2179,7 @@
     });
   }
 
-  function setupMenu(){
+  function setupMenu() {
     var btn = el('hamburgerBtn');
     var nav = el('headerNav');
     if (!btn || !nav) return;
@@ -2350,7 +2197,7 @@
     });
   }
 
-  function setupEmptyReset(){
+  function setupEmptyReset() {
     var b = el('emptyReset');
     if (!b) return;
     b.addEventListener('click', function () {
@@ -2365,7 +2212,7 @@
     });
   }
 
-  function setupReviewSort(){
+  function setupReviewSort() {
     var sel = el('reviewSort');
     if (!sel) return;
     sel.addEventListener('change', function () {
@@ -2377,17 +2224,32 @@
   /* ==========================================================================
      16. INIT
      ========================================================================== */
+  async function init() {
+    // 1. Wait for the shared auth module (which owns the Supabase client).
+    if (window.VionaAuth && typeof window.VionaAuth.ready === 'function') {
+      try {
+        var ok = await window.VionaAuth.ready();
+        if (ok) {
+          sb = window.VionaAuth.client;
+          SUPABASE_READY = !!sb;
+          state.currentUser = window.VionaAuth.getUser();
+          state.currentProfile = window.VionaAuth.getProfile();
+        }
+      } catch (e) { /* fall back to demo data */ }
+    }
 
-  async function init(){
-    // 1. Settings (needed by both grid and modal)
+    if (!SUPABASE_READY && cfgLooksOk() && !window.VionaAuth) {
+      // VionaAuth missing entirely — auth.js was not loaded.
+      console.warn('[viona] auth.js not loaded; reviews will require login but no modal will open.');
+    }
+
+    // 2. Settings
     state.settings = await loadSettings();
     applySettings();
 
-    // 2. Products + categories
+    // 3. Products + categories
     await loadProducts();
     buildCategories();
-
-    // 3. First paint of the grid
     applyFilters();
 
     // 4. FAQs
@@ -2409,10 +2271,17 @@
     setupReviewSort();
     setupLightbox();
 
-    // 7. Auth (Supabase only)
-    if (SUPABASE_READY) {
-      state.currentUser = await getCurrentUser();
-      listenAuthChanges();
+    // 7. React to auth changes so the review section updates live.
+    if (window.VionaAuth && typeof window.VionaAuth.onChange === 'function') {
+      window.VionaAuth.onChange(function (user, profile) {
+        state.currentUser = user || null;
+        state.currentProfile = profile || null;
+        if (state.currentProduct) {
+          loadReviewsForProduct(state.currentProduct.id).then(function () {
+            renderReviewsForProduct(state.currentProduct.id);
+          });
+        }
+      });
     }
 
     // 8. Deep link (#product=VB-001)
@@ -2431,13 +2300,12 @@
     });
   }
 
-  // Run once DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      init().catch(function () { /* never crash the page */ });
+      init().catch(function (e) { console.warn('[viona] init failed:', e); });
     });
   } else {
-    init().catch(function () { /* never crash the page */ });
+    init().catch(function (e) { console.warn('[viona] init failed:', e); });
   }
 
 })();
