@@ -1,81 +1,72 @@
-/* ==========================================================================
+/* ============================================================================
    Viona Bangles — Admin Panel logic
-   Plain vanilla JS. Requires supabase-js v2 + js/config.js (window.VIONA_CONFIG)
-   ========================================================================== */
+   ----------------------------------------------------------------------------
+   Plain vanilla JS. Uses:
+     - supabase-js v2 (from CDN, loaded in admin.html)
+     - js/config.js       (window.VIONA_CONFIG)
+     - js/auth.js         (window.VionaAuth — shared auth + Supabase client)
+
+   Responsibilities:
+     - Google login (via VionaAuth.client.auth.signInWithOAuth, redirectTo admin.html)
+     - Admin verification (VionaAuth.isAdmin)
+     - "Not an admin" screen with logout
+     - Products tab (list, filters, add/edit/delete, photo upload)
+     - Offers & Settings tab (site_settings table)
+     - Customers tab (NEW — read-only list of customers with search)
+   ============================================================================ */
+
 (function () {
   "use strict";
 
   /* ------------------------------------------------------------------
-     0. CONFIG VALIDATION
+     Constants
      ------------------------------------------------------------------ */
-  var CONFIG_FIX = " Fix it in js/config.js";
   var BUCKET = "product-images";
   var MAX_FILE_BYTES = 8 * 1024 * 1024;      // 8 MB
-  var MAX_IMAGE_WIDTH = 1200;                // px, before compression
+  var MAX_IMAGE_WIDTH = 1200;                // px before compression
   var JPEG_QUALITY = 0.82;
   var MAX_MORE_PHOTOS = 5;
   var OFFER_TEXT_MAX = 140;
 
-  function getConfigProblem() {
-    var cfg = (typeof window !== "undefined") ? window.VIONA_CONFIG : null;
-
-    if (!cfg || typeof cfg !== "object") {
-      return "config.js did not load." + CONFIG_FIX;
-    }
-
-    var problems = [];
-    var url = cfg.SUPABASE_URL;
-    var key = cfg.SUPABASE_ANON_KEY;
-
-    if (
-      typeof url !== "string" ||
-      url.indexOf("https://") !== 0 ||
-      url.indexOf("supabase.co") === -1 ||
-      url.indexOf("PASTE") !== -1
-    ) {
-      problems.push("Project URL is missing or invalid.");
-    }
-
-    if (
-      typeof key !== "string" ||
-      key.length <= 20 ||
-      key.indexOf("PASTE") !== -1
-    ) {
-      problems.push("anon key is missing.");
-    }
-
-    if (problems.length) return problems.join(" ") + CONFIG_FIX;
-    return null;
-  }
-
   /* ------------------------------------------------------------------
-     1. STATE
+     State
      ------------------------------------------------------------------ */
   var state = {
     sb: null,
     user: null,
-    isAdmin: false,
+    lastUserId: null,
     adminEmail: "",
     products: [],
     productsLoaded: false,
+    loadingProducts: false,
+    customers: [],
+    customersLoaded: false,
+    loadingCustomers: false,
     filters: { search: "", category: "", status: "" },
-    editingProduct: null,     // product object being edited (null = new)
-    sizes: [],                // reserved
-    mainImage: "",            // current main image URL in the modal
-    additionalImages: [],     // current additional image URLs in the modal
+    customerFilter: "",
+    editingProduct: null,
+    mainImage: "",
+    additionalImages: [],
     uploadingCount: 0,
-    modalSession: null,       // { uploads: [], original: {...}, saved: bool }
+    modalSession: null,
     currentTab: "products",
-    settingsLoaded: false
+    lastScreen: ""
   };
 
   /* ------------------------------------------------------------------
-     2. DOM HELPERS
+     DOM helpers
      ------------------------------------------------------------------ */
   function $(id) { return document.getElementById(id); }
 
   function $$(sel, root) {
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  }
+
+  function make(tag, className, text) {
+    var e = document.createElement(tag);
+    if (className) e.className = className;
+    if (text != null) e.textContent = String(text);
+    return e;
   }
 
   function showEl(el) {
@@ -90,13 +81,6 @@
     el.hidden = true;
   }
 
-  function make(tag, className, text) {
-    var e = document.createElement(tag);
-    if (className) e.className = className;
-    if (text != null) e.textContent = String(text);
-    return e;
-  }
-
   function friendly(err) {
     if (!err) return "";
     if (typeof err === "string") return err;
@@ -106,15 +90,22 @@
   function formatPrice(n) {
     var num = Number(n);
     if (!isFinite(num)) return "Rs 0";
+    try { return "Rs " + num.toLocaleString("en-IN"); }
+    catch (e) { return "Rs " + num; }
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "";
     try {
-      return "Rs " + num.toLocaleString("en-IN");
-    } catch (e) {
-      return "Rs " + num;
-    }
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return "";
+      var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear();
+    } catch (e) { return ""; }
   }
 
   /* ------------------------------------------------------------------
-     3. TOAST / BUSY / CONFIRM
+     Toast / Busy / Confirm
      ------------------------------------------------------------------ */
   var toastTimer = null;
 
@@ -164,7 +155,7 @@
   }
 
   /* ------------------------------------------------------------------
-     4. MODALS
+     Modals
      ------------------------------------------------------------------ */
   function openModal(id) {
     var el = $(id);
@@ -205,6 +196,8 @@
 
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;
+      // Let VionaAuth handle its own modals first
+      if (document.querySelector(".va-backdrop:not([hidden])")) return;
       var open = document.querySelector(".modal:not(.hidden)");
       if (!open || !open.id) return;
       if (open.id === "confirmModal") closeConfirm(false);
@@ -213,17 +206,30 @@
   }
 
   /* ------------------------------------------------------------------
-     5. SCREENS
+     Screens
      ------------------------------------------------------------------ */
   function showScreen(name) {
+    if (state.lastScreen === name) return;
+    state.lastScreen = name;
+
     var login = $("loginScreen");
+    var notAdmin = $("notAdminScreen");
     var app = $("app");
-    if (name === "app") {
-      hideEl(login);
-      showEl(app);
-    } else {
-      showEl(login);
-      hideEl(app);
+
+    [login, notAdmin, app].forEach(function (el) {
+      if (!el) return;
+      el.classList.add("hidden");
+      el.hidden = true;
+    });
+
+    var target = null;
+    if (name === "app") target = app;
+    else if (name === "notAdmin") target = notAdmin;
+    else target = login;
+
+    if (target) {
+      target.classList.remove("hidden");
+      target.hidden = false;
     }
   }
 
@@ -254,108 +260,116 @@
     btn.style.cursor = "not-allowed";
   }
 
-  /* ------------------------------------------------------------------
-     6. AUTH
-     ------------------------------------------------------------------ */
-  function redirectUrl() {
-    return window.location.origin + window.location.pathname;
+  function setLoginBtnBusy(on) {
+    var btn = $("loginGoogleBtn");
+    if (!btn) return;
+    var span = btn.querySelector("span");
+    if (on) {
+      btn.disabled = true;
+      btn.style.opacity = "0.6";
+      btn.style.cursor = "not-allowed";
+      if (span) {
+        if (!span.dataset.vaOriginal) span.dataset.vaOriginal = span.textContent;
+        span.textContent = "Redirecting…";
+      }
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = "";
+      btn.style.cursor = "";
+      if (span && span.dataset.vaOriginal) {
+        span.textContent = span.dataset.vaOriginal;
+        delete span.dataset.vaOriginal;
+      }
+    }
   }
 
-  async function signInWithGoogle() {
+  /* ------------------------------------------------------------------
+     Auth (delegated to VionaAuth)
+     ------------------------------------------------------------------ */
+  function adminRedirectUrl() {
+    var base = (window.VIONA_CONFIG && window.VIONA_CONFIG.SITE_URL) ||
+               (window.location.origin + "/");
+    base = String(base).replace(/\/+$/, "");
+    return base + "/admin.html";
+  }
+
+  async function onLoginGoogleClick() {
     if (!state.sb) return;
     setLoginNote("");
+    setLoginBtnBusy(true);
     try {
       var res = await state.sb.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: redirectUrl() }
+        options: { redirectTo: adminRedirectUrl() }
       });
-      if (res && res.error) {
-        toast(friendly(res.error) || "Sign-in failed.", "error");
-      }
+      if (res && res.error) throw res.error;
+      // The browser is navigating away — keep the button busy.
     } catch (err) {
-      toast(friendly(err) || "Sign-in failed.", "error");
+      setLoginBtnBusy(false);
+      toast(friendly(err) || "Sign-in failed. Please try again.", "error");
     }
   }
 
-  async function signOut() {
+  async function onLogoutClick() {
     try {
-      if (state.sb) await state.sb.auth.signOut();
-    } catch (e) { /* ignore */ }
-
-    state.user = null;
-    state.isAdmin = false;
-    state.adminEmail = "";
-    state.products = [];
-    state.productsLoaded = false;
-
-    setLoginNote("");
-    showScreen("login");
-  }
-
-  async function isAdminEmail(email) {
-    if (!email || !state.sb) return false;
-    var lower = String(email).toLowerCase();
-    try {
-      var res = await state.sb
-        .from("admins")
-        .select("email")
-        .eq("email", lower)
-        .limit(1);
-      if (res.error) {
-        console.warn("Admin check failed:", res.error.message);
-        return false;
+      if (window.VionaAuth && typeof window.VionaAuth.logout === "function") {
+        await window.VionaAuth.logout();
+      } else if (state.sb) {
+        await state.sb.auth.signOut();
       }
-      return Array.isArray(res.data) && res.data.length > 0;
-    } catch (e) {
-      console.warn("Admin check exception:", e);
-      return false;
-    }
+    } catch (e) { /* ignore */ }
   }
 
-  async function handleSession(session) {
-    if (!session || !session.user) {
-      state.user = null;
-      state.isAdmin = false;
+  async function handleAuthState(user) {
+    state.user = user || null;
+
+    var newUserId = user ? user.id : null;
+    if (newUserId !== state.lastUserId) {
+      state.lastUserId = newUserId;
+      state.productsLoaded = false;
+      state.customersLoaded = false;
+      state.products = [];
+      state.customers = [];
+    }
+
+    if (!user) {
       state.adminEmail = "";
+      setLoginNote("");
+      setLoginBtnBusy(false);
       showScreen("login");
       return;
     }
 
-    state.user = session.user;
-    var email = String(session.user.email || "").toLowerCase();
-
-    var ok = await isAdminEmail(email);
+    // Ask VionaAuth whether this email is in the admins table.
+    var ok = false;
+    try { ok = await window.VionaAuth.isAdmin(); } catch (e) { ok = false; }
 
     if (!ok) {
-      state.isAdmin = false;
-      state.adminEmail = "";
-      try { await state.sb.auth.signOut(); } catch (e) { /* ignore */ }
-      state.user = null;
-      showScreen("login");
-      setLoginNote("This Google account is not an admin.");
+      state.adminEmail = String(user.email || "");
+      var em = $("notAdminEmail");
+      if (em) em.textContent = state.adminEmail || "—";
+      showScreen("notAdmin");
       return;
     }
 
-    if (state.isAdmin && state.adminEmail === email) {
-      showScreen("app");
-      if (!state.productsLoaded) await loadProducts();
-      return;
-    }
-
-    state.isAdmin = true;
-    state.adminEmail = email;
-
+    state.adminEmail = String(user.email || "").toLowerCase();
     var emailEl = $("adminEmail");
-    if (emailEl) emailEl.textContent = email;
+    if (emailEl) emailEl.textContent = state.adminEmail;
 
-    setLoginNote("");
     showScreen("app");
-    setTab("products");
-    await loadProducts();
+
+    // Load data for the current tab if needed.
+    if (state.currentTab === "settings") {
+      loadSettings();
+    } else if (state.currentTab === "customers") {
+      if (!state.customersLoaded) await loadCustomers();
+    } else {
+      if (!state.productsLoaded) await loadProducts();
+    }
   }
 
   /* ------------------------------------------------------------------
-     7. TABS
+     Tabs
      ------------------------------------------------------------------ */
   function setTab(name) {
     state.currentTab = name;
@@ -366,14 +380,21 @@
 
     var pp = $("panel-products");
     var ps = $("panel-settings");
+    var pc = $("panel-customers");
+
+    if (pp) hideEl(pp);
+    if (ps) hideEl(ps);
+    if (pc) hideEl(pc);
 
     if (name === "settings") {
-      if (pp) hideEl(pp);
       if (ps) showEl(ps);
       loadSettings();
+    } else if (name === "customers") {
+      if (pc) showEl(pc);
+      if (!state.customersLoaded) loadCustomers();
     } else {
       if (pp) showEl(pp);
-      if (ps) hideEl(ps);
+      if (!state.productsLoaded) loadProducts();
     }
   }
 
@@ -387,10 +408,12 @@
   }
 
   /* ------------------------------------------------------------------
-     8. PRODUCTS — LOAD / RENDER
+     Products — load / render
      ------------------------------------------------------------------ */
   async function loadProducts() {
-    if (!state.sb) return;
+    if (!state.sb || state.loadingProducts) return;
+    state.loadingProducts = true;
+
     var list = $("productsList");
     if (list) {
       list.textContent = "";
@@ -418,6 +441,8 @@
           "Could not load products. " + (friendly(err) || "")
         ));
       }
+    } finally {
+      state.loadingProducts = false;
     }
   }
 
@@ -458,7 +483,6 @@
     var card = make("article", "list-item");
     card.setAttribute("data-id", String(p.id));
 
-    /* ----- thumbnail ----- */
     if (p.main_image) {
       var img = document.createElement("img");
       img.className = "list-item-thumb";
@@ -474,7 +498,6 @@
       card.appendChild(make("div", "list-item-thumb-empty", "No photo"));
     }
 
-    /* ----- body ----- */
     var body = make("div", "list-item-body");
 
     body.appendChild(make("h3", "list-item-title", p.name || "Untitled"));
@@ -506,7 +529,6 @@
 
     card.appendChild(body);
 
-    /* ----- actions ----- */
     var actions = make("div", "list-item-actions");
     var isActive = p.is_active !== false;
 
@@ -570,7 +592,7 @@
       var t = e.target;
       if (!t || !t.closest) return;
 
-      if (t.closest(".toggle")) return; // handled by change
+      if (t.closest(".toggle")) return;
 
       var btn = t.closest("[data-action]");
       if (!btn) return;
@@ -647,7 +669,8 @@
         if (lbl) lbl.textContent = active ? "Active" : "Hidden";
       }
 
-      toast(active ? "Product is now visible on the website." : "Product hidden from the website.", "success");
+      toast(active ? "Product is now visible on the website."
+                   : "Product hidden from the website.", "success");
     } catch (err) {
       if (input) input.checked = !active;
       toast(friendly(err) || "Could not update the product.", "error");
@@ -694,7 +717,7 @@
   }
 
   /* ------------------------------------------------------------------
-     9. IMAGE HELPERS
+     Image helpers
      ------------------------------------------------------------------ */
   function bucketBase() {
     var url = (window.VIONA_CONFIG && window.VIONA_CONFIG.SUPABASE_URL) || "";
@@ -721,9 +744,7 @@
       var path = pathFromPublicUrl(url);
       if (!path || !state.sb) return;
       await state.sb.storage.from(BUCKET).remove([path]);
-    } catch (e) {
-      /* ignore — best effort */
-    }
+    } catch (e) { /* best effort */ }
   }
 
   function validateImageFile(file) {
@@ -815,7 +836,7 @@
   }
 
   /* ------------------------------------------------------------------
-     10. PRODUCT MODAL — open / reset
+     Product modal
      ------------------------------------------------------------------ */
   function setUploadStatus(msg) {
     var el = $("uploadStatus");
@@ -1079,7 +1100,7 @@
   }
 
   /* ------------------------------------------------------------------
-     11. PRODUCT MODAL — photo uploads
+     Product modal — photo uploads
      ------------------------------------------------------------------ */
   function wirePhotoUploads() {
     var mainInput = $("mainPhotoInput");
@@ -1218,7 +1239,7 @@
   }
 
   /* ------------------------------------------------------------------
-     12. PRODUCT MODAL — save
+     Product modal — save
      ------------------------------------------------------------------ */
   async function cleanupUnusedImages(savedProduct) {
     var keep = {};
@@ -1362,7 +1383,8 @@
       await loadProducts();
     } catch (err) {
       var msg = friendly(err) || "Could not save the product.";
-      if ((err && err.code === "23505") || /duplicate key|unique constraint|already exists/i.test(msg)) {
+      if ((err && err.code === "23505") ||
+          /duplicate key|unique constraint|already exists/i.test(msg)) {
         msg = "That product code is already in use. Please choose another.";
       }
       showProductError(msg);
@@ -1372,7 +1394,7 @@
   }
 
   /* ------------------------------------------------------------------
-     13. SETTINGS — load / save
+     Settings — load / save
      ------------------------------------------------------------------ */
   function updateOfferCounter() {
     var ta = $("setOfferText");
@@ -1445,7 +1467,6 @@
         if (row && row.key != null) map[row.key] = row.value;
       });
 
-      state.settingsLoaded = true;
       applySettingsToForm(map);
     } catch (err) {
       toast(friendly(err) || "Could not load settings.", "error");
@@ -1539,24 +1560,137 @@
   }
 
   /* ------------------------------------------------------------------
-     14. WIRING
+     Customers (NEW)
+     ------------------------------------------------------------------ */
+  async function loadCustomers() {
+    if (!state.sb || state.loadingCustomers) return;
+    state.loadingCustomers = true;
+
+    var list = $("customersList");
+    if (list) {
+      list.textContent = "";
+      list.appendChild(make("p", "loading-line", "Loading customers…"));
+    }
+
+    try {
+      var res = await state.sb
+        .from("customers")
+        .select("id,name,phone,email,city,created_at,updated_at")
+        .order("created_at", { ascending: false });
+
+      if (res.error) throw res.error;
+
+      state.customers = Array.isArray(res.data) ? res.data : [];
+      state.customersLoaded = true;
+      renderCustomers();
+    } catch (err) {
+      if (list) {
+        list.textContent = "";
+        list.appendChild(make(
+          "p",
+          "loading-line",
+          "Could not load customers. " + (friendly(err) || "")
+        ));
+      }
+    } finally {
+      state.loadingCustomers = false;
+    }
+  }
+
+  function customerMatches(c, q) {
+    if (!q) return true;
+    var hay = [
+      c.name, c.phone, c.email, c.city
+    ].filter(Boolean).join(" ").toLowerCase();
+    return hay.indexOf(q) !== -1;
+  }
+
+  function buildCustomerRow(c) {
+    var row = make("div", "customer-row");
+
+    var left = make("div", "customer-row-left");
+    left.appendChild(make("p", "customer-row-name", c.name || "Unnamed"));
+    if (c.phone) left.appendChild(make("p", "customer-row-line", "Phone: " + c.phone));
+    if (c.email) left.appendChild(make("p", "customer-row-line", "Email: " + c.email));
+    if (c.city)  left.appendChild(make("p", "customer-row-line", "City: " + c.city));
+    row.appendChild(left);
+
+    var right = make("div", "customer-row-right");
+    var joined = c.created_at ? formatDate(c.created_at) : "";
+    right.appendChild(make(
+      "p",
+      "customer-row-joined",
+      joined ? ("Joined " + joined) : ""
+    ));
+    row.appendChild(right);
+
+    return row;
+  }
+
+  function renderCustomers() {
+    var list = $("customersList");
+    var empty = $("customersEmpty");
+    if (!list) return;
+
+    list.textContent = "";
+
+    var q = String(state.customerFilter || "").trim().toLowerCase();
+    var items = state.customers.filter(function (c) { return customerMatches(c, q); });
+
+    if (!items.length) {
+      if (empty) {
+        empty.textContent = state.customers.length
+          ? "No customers match your search."
+          : "No customers yet.";
+        empty.hidden = false;
+      }
+      return;
+    }
+    if (empty) empty.hidden = true;
+
+    items.forEach(function (c) {
+      list.appendChild(buildCustomerRow(c));
+    });
+  }
+
+  function wireCustomers() {
+    var search = $("customerSearch");
+    if (search) {
+      search.addEventListener("input", function () {
+        state.customerFilter = search.value || "";
+        renderCustomers();
+      });
+    }
+
+    var reload = $("reloadCustomersBtn");
+    if (reload) {
+      reload.addEventListener("click", function () {
+        state.customersLoaded = false;
+        loadCustomers();
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     UI wiring
      ------------------------------------------------------------------ */
   function wireUI() {
-    /* --- auth --- */
+    // Auth buttons
     var googleBtn = $("loginGoogleBtn");
-    if (googleBtn) googleBtn.addEventListener("click", signInWithGoogle);
+    if (googleBtn) googleBtn.addEventListener("click", onLoginGoogleClick);
 
     var signOutBtn = $("signOutBtn");
-    if (signOutBtn) signOutBtn.addEventListener("click", signOut);
+    if (signOutBtn) signOutBtn.addEventListener("click", onLogoutClick);
 
-    /* --- tabs --- */
+    var notAdminLogout = $("notAdminLogoutBtn");
+    if (notAdminLogout) notAdminLogout.addEventListener("click", onLogoutClick);
+
+    // Tabs
     wireTabs();
 
-    /* --- products --- */
+    // Products
     var newBtn = $("newProductBtn");
-    if (newBtn) {
-      newBtn.addEventListener("click", function () { openProductModal(null); });
-    }
+    if (newBtn) newBtn.addEventListener("click", function () { openProductModal(null); });
 
     var saveBtn = $("saveProductBtn");
     if (saveBtn) saveBtn.addEventListener("click", saveProduct);
@@ -1565,77 +1699,84 @@
     wireProductFilters();
     wirePhotoUploads();
 
-    /* --- confirm dialog --- */
+    // Confirm dialog
     var yes = $("confirmYes");
     if (yes) yes.addEventListener("click", function () { closeConfirm(true); });
 
     var no = $("confirmNo");
     if (no) no.addEventListener("click", function () { closeConfirm(false); });
 
-    /* --- settings --- */
+    // Settings
     wireSettings();
 
-    /* --- modals --- */
+    // Customers
+    wireCustomers();
+
+    // Modals
     wireModals();
   }
 
   /* ------------------------------------------------------------------
-     15. BOOT
+     Boot
      ------------------------------------------------------------------ */
   async function boot() {
     wireUI();
 
-    var problem = getConfigProblem();
-    if (problem) {
-      showScreen("login");
-      showConfigWarning(problem);
-      disableLoginButton();
-      return;
-    }
+    // Make sure the login screen is the visible one to start with.
+    state.lastScreen = "login";
+    showScreen("login");
 
-    if (!window.supabase || typeof window.supabase.createClient !== "function") {
-      showScreen("login");
+    if (!window.VionaAuth || typeof window.VionaAuth.ready !== "function") {
       showConfigWarning(
-        "The Supabase library did not load. Check your internet connection and reload the page." + CONFIG_FIX
+        "auth.js load nahi hui. Page reload karo — ya js/auth.js ko sahi se upload karo."
       );
       disableLoginButton();
       return;
     }
 
-    var cfg = window.VIONA_CONFIG;
-
+    var ready = false;
     try {
-      state.sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      ready = await window.VionaAuth.ready();
     } catch (e) {
-      showScreen("login");
+      ready = false;
+    }
+
+    if (!ready) {
       showConfigWarning(
-        "Could not start Supabase: " + (friendly(e) || "unknown error") + "." + CONFIG_FIX
+        "Supabase config check karo — js/config.js me SUPABASE_URL aur SUPABASE_ANON_KEY sahi hone chahiye."
       );
       disableLoginButton();
       return;
     }
 
-    state.sb.auth.onAuthStateChange(function (event, session) {
-      /* Defer so supabase-js internals are not blocked */
-      setTimeout(function () {
-        handleSession(session).catch(function (e) {
-          console.warn("Session handling failed:", e);
-        });
-      }, 0);
+    state.sb = window.VionaAuth.client;
+    if (!state.sb) {
+      showConfigWarning("Supabase client start nahi hua. Page reload karo.");
+      disableLoginButton();
+      return;
+    }
+
+    // Clean up OAuth hash params if present after returning from Google.
+    try {
+      var h = window.location.hash || "";
+      if (h.indexOf("access_token") !== -1 || h.indexOf("error_description") !== -1) {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    } catch (e) { /* ignore */ }
+
+    // React to auth state changes from the shared auth module.
+    window.VionaAuth.onChange(function (user /*, profile */) {
+      handleAuthState(user).catch(function (e) {
+        console.warn("[admin] auth handling failed:", e);
+      });
     });
-
-    try {
-      var sess = await state.sb.auth.getSession();
-      var session = (sess && sess.data) ? sess.data.session : null;
-      await handleSession(session);
-    } catch (e) {
-      showScreen("login");
-    }
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("DOMContentLoaded", function () {
+      boot().catch(function (e) { console.warn("[admin] boot failed:", e); });
+    });
   } else {
-    boot();
+    boot().catch(function (e) { console.warn("[admin] boot failed:", e); });
   }
 })();
