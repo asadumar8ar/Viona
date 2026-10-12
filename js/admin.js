@@ -1,36 +1,37 @@
 /* ============================================================================
    Viona Bangles — Admin Panel logic
    ----------------------------------------------------------------------------
-   Plain vanilla JS. Uses:
-     - supabase-js v2 (from CDN, loaded in admin.html)
-     - js/config.js       (window.VIONA_CONFIG)
-     - js/auth.js         (window.VionaAuth — shared auth + Supabase client)
+   Plain vanilla JS. Loads after:
+     - supabase-js v2 (from CDN)
+     - js/config.js  (window.VIONA_CONFIG)
+     - js/auth.js    (window.VionaAuth — shared auth + Supabase client)
 
-   Responsibilities:
-     - Google login (via VionaAuth.client.auth.signInWithOAuth, redirectTo admin.html)
-     - Admin verification (VionaAuth.isAdmin)
-     - "Not an admin" screen with logout
-     - Products tab (list, filters, add/edit/delete, photo upload)
-     - Offers & Settings tab (site_settings table)
-     - Customers tab (NEW — read-only list of customers with search)
+   What this file does:
+     - Google sign-in (via VionaAuth / supabase-js) with redirect to admin.html
+     - Checks admin status with the SQL helper (is_admin) through VionaAuth.isAdmin()
+     - Shows "Access denied" screen for non-admin users, with a logout button
+     - Products tab: list, search/filter, add, edit, delete (with confirm)
+     - Photo upload to the "product-images" bucket (main + extras, max 5 each)
+     - Offers & Settings tab: reads/writes the site_settings key/value table
+     - Friendly toast messages, busy overlay, and error handling everywhere
    ============================================================================ */
 
 (function () {
   "use strict";
 
-  /* ------------------------------------------------------------------
+  /* --------------------------------------------------------------------
      Constants
-     ------------------------------------------------------------------ */
+     -------------------------------------------------------------------- */
   var BUCKET = "product-images";
-  var MAX_FILE_BYTES = 8 * 1024 * 1024;      // 8 MB
-  var MAX_IMAGE_WIDTH = 1200;                // px before compression
+  var MAX_FILE_BYTES = 5 * 1024 * 1024;      // 5 MB per file (matches admin.html hint)
+  var MAX_IMAGE_WIDTH = 1200;                // px — images are resized before upload
   var JPEG_QUALITY = 0.82;
   var MAX_MORE_PHOTOS = 5;
   var OFFER_TEXT_MAX = 140;
 
-  /* ------------------------------------------------------------------
+  /* --------------------------------------------------------------------
      State
-     ------------------------------------------------------------------ */
+     -------------------------------------------------------------------- */
   var state = {
     sb: null,
     user: null,
@@ -39,11 +40,7 @@
     products: [],
     productsLoaded: false,
     loadingProducts: false,
-    customers: [],
-    customersLoaded: false,
-    loadingCustomers: false,
     filters: { search: "", category: "", status: "" },
-    customerFilter: "",
     editingProduct: null,
     mainImage: "",
     additionalImages: [],
@@ -53,9 +50,9 @@
     lastScreen: ""
   };
 
-  /* ------------------------------------------------------------------
-     DOM helpers
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Tiny DOM helpers
+     -------------------------------------------------------------------- */
   function $(id) { return document.getElementById(id); }
 
   function $$(sel, root) {
@@ -94,21 +91,10 @@
     catch (e) { return "Rs " + num; }
   }
 
-  function formatDate(iso) {
-    if (!iso) return "";
-    try {
-      var d = new Date(iso);
-      if (isNaN(d.getTime())) return "";
-      var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      return d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear();
-    } catch (e) { return ""; }
-  }
-
-  /* ------------------------------------------------------------------
+  /* --------------------------------------------------------------------
      Toast / Busy / Confirm
-     ------------------------------------------------------------------ */
+     -------------------------------------------------------------------- */
   var toastTimer = null;
-
   function toast(msg, kind) {
     var el = $("toast");
     if (!el) return;
@@ -120,7 +106,6 @@
   }
 
   var busyDepth = 0;
-
   function busy(on) {
     var el = $("busy");
     if (!el) return;
@@ -131,7 +116,6 @@
   }
 
   var confirmResolve = null;
-
   function askConfirm(title, text, okLabel) {
     return new Promise(function (resolve) {
       confirmResolve = resolve;
@@ -144,7 +128,6 @@
       showEl($("confirmModal"));
     });
   }
-
   function closeConfirm(result) {
     hideEl($("confirmModal"));
     if (confirmResolve) {
@@ -154,9 +137,9 @@
     }
   }
 
-  /* ------------------------------------------------------------------
-     Modals
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Modal open/close + backdrop + Escape key
+     -------------------------------------------------------------------- */
   function openModal(id) {
     var el = $(id);
     if (el) showEl(el);
@@ -196,8 +179,6 @@
 
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;
-      // Let VionaAuth handle its own modals first
-      if (document.querySelector(".va-backdrop:not([hidden])")) return;
       var open = document.querySelector(".modal:not(.hidden)");
       if (!open || !open.id) return;
       if (open.id === "confirmModal") closeConfirm(false);
@@ -205,9 +186,9 @@
     });
   }
 
-  /* ------------------------------------------------------------------
-     Screens
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Screens (login / not-admin / app)
+     -------------------------------------------------------------------- */
   function showScreen(name) {
     if (state.lastScreen === name) return;
     state.lastScreen = name;
@@ -222,11 +203,9 @@
       el.hidden = true;
     });
 
-    var target = null;
-    if (name === "app") target = app;
-    else if (name === "notAdmin") target = notAdmin;
-    else target = login;
-
+    var target = name === "app" ? app
+               : name === "notAdmin" ? notAdmin
+               : login;
     if (target) {
       target.classList.remove("hidden");
       target.hidden = false;
@@ -236,13 +215,8 @@
   function setLoginNote(msg) {
     var el = $("loginNote");
     if (!el) return;
-    if (msg) {
-      el.textContent = msg;
-      showEl(el);
-    } else {
-      el.textContent = "";
-      hideEl(el);
-    }
+    if (msg) { el.textContent = msg; showEl(el); }
+    else { el.textContent = ""; hideEl(el); }
   }
 
   function showConfigWarning(msg) {
@@ -283,9 +257,9 @@
     }
   }
 
-  /* ------------------------------------------------------------------
-     Auth (delegated to VionaAuth)
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Auth (Google sign-in + admin check + logout)
+     -------------------------------------------------------------------- */
   function adminRedirectUrl() {
     var base = (window.VIONA_CONFIG && window.VIONA_CONFIG.SITE_URL) ||
                (window.location.origin + "/");
@@ -303,7 +277,7 @@
         options: { redirectTo: adminRedirectUrl() }
       });
       if (res && res.error) throw res.error;
-      // The browser is navigating away — keep the button busy.
+      // Browser is navigating away — keep the button busy.
     } catch (err) {
       setLoginBtnBusy(false);
       toast(friendly(err) || "Sign-in failed. Please try again.", "error");
@@ -327,9 +301,7 @@
     if (newUserId !== state.lastUserId) {
       state.lastUserId = newUserId;
       state.productsLoaded = false;
-      state.customersLoaded = false;
       state.products = [];
-      state.customers = [];
     }
 
     if (!user) {
@@ -340,7 +312,7 @@
       return;
     }
 
-    // Ask VionaAuth whether this email is in the admins table.
+    // Ask the shared auth module to check the is_admin() SQL function.
     var ok = false;
     try { ok = await window.VionaAuth.isAdmin(); } catch (e) { ok = false; }
 
@@ -358,19 +330,17 @@
 
     showScreen("app");
 
-    // Load data for the current tab if needed.
+    // Lazily load data for whichever tab is showing.
     if (state.currentTab === "settings") {
       loadSettings();
-    } else if (state.currentTab === "customers") {
-      if (!state.customersLoaded) await loadCustomers();
     } else {
       if (!state.productsLoaded) await loadProducts();
     }
   }
 
-  /* ------------------------------------------------------------------
+  /* --------------------------------------------------------------------
      Tabs
-     ------------------------------------------------------------------ */
+     -------------------------------------------------------------------- */
   function setTab(name) {
     state.currentTab = name;
 
@@ -380,18 +350,12 @@
 
     var pp = $("panel-products");
     var ps = $("panel-settings");
-    var pc = $("panel-customers");
-
     if (pp) hideEl(pp);
     if (ps) hideEl(ps);
-    if (pc) hideEl(pc);
 
     if (name === "settings") {
       if (ps) showEl(ps);
       loadSettings();
-    } else if (name === "customers") {
-      if (pc) showEl(pc);
-      if (!state.customersLoaded) loadCustomers();
     } else {
       if (pp) showEl(pp);
       if (!state.productsLoaded) loadProducts();
@@ -407,9 +371,9 @@
     });
   }
 
-  /* ------------------------------------------------------------------
-     Products — load / render
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Products: load / stats / filter / render
+     -------------------------------------------------------------------- */
   async function loadProducts() {
     if (!state.sb || state.loadingProducts) return;
     state.loadingProducts = true;
@@ -421,11 +385,8 @@
     }
 
     try {
-      var res = await state.sb
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
+      // Order by id desc as a safe default (created_at may not always exist).
+      var res = await state.sb.from("products").select("*").order("id", { ascending: false });
       if (res.error) throw res.error;
 
       state.products = Array.isArray(res.data) ? res.data : [];
@@ -436,8 +397,7 @@
       if (list) {
         list.textContent = "";
         list.appendChild(make(
-          "p",
-          "loading-line",
+          "p", "loading-line",
           "Could not load products. " + (friendly(err) || "")
         ));
       }
@@ -454,12 +414,9 @@
     });
     var hidden = total - active;
 
-    var t = $("statTotal");
-    var a = $("statActive");
-    var h = $("statHidden");
-    if (t) t.textContent = String(total);
-    if (a) a.textContent = String(active);
-    if (h) h.textContent = String(hidden);
+    var t = $("statTotal"); if (t) t.textContent = String(total);
+    var a = $("statActive"); if (a) a.textContent = String(active);
+    var h = $("statHidden"); if (h) h.textContent = String(hidden);
   }
 
   function matchesFilters(p) {
@@ -470,12 +427,9 @@
       var hay = String(p.name || "") + " " + String(p.code || "");
       if (hay.toLowerCase().indexOf(q) === -1) return false;
     }
-
     if (f.category && p.category !== f.category) return false;
-
     if (f.status === "active" && p.is_active === false) return false;
     if (f.status === "hidden" && p.is_active !== false) return false;
-
     return true;
   }
 
@@ -501,36 +455,25 @@
     var body = make("div", "list-item-body");
 
     body.appendChild(make("h3", "list-item-title", p.name || "Untitled"));
-    body.appendChild(make(
-      "p",
-      "list-item-meta",
-      (p.code || "—") + " · " + (p.category || "uncategorised")
-    ));
+    body.appendChild(make("p", "list-item-meta",
+      (p.code || "—") + " · " + (p.category || "uncategorised")));
 
-    var sizeText = (Array.isArray(p.sizes) && p.sizes.length)
-      ? "Sizes: " + p.sizes.join(", ")
-      : "No sizes";
+    var sizes = readSizes(p.sizes);
+    var sizeText = sizes.length ? ("Sizes: " + sizes.join(", ")) : "No sizes";
     body.appendChild(make("p", "list-item-meta", sizeText));
 
     body.appendChild(make("p", "list-item-price", formatPrice(p.price)));
 
+    var isActive = p.is_active !== false;
     var badges = make("p", "list-item-badges");
-    if (p.stock_status === "out_of_stock") {
-      badges.appendChild(make("span", "badge badge-warn", "Out of stock"));
-    } else if (p.stock_status === "made_to_order") {
-      badges.appendChild(make("span", "badge badge-info", "Made to order"));
-    } else {
-      badges.appendChild(make("span", "badge badge-active", "In stock"));
-    }
-    if (p.is_featured) {
-      badges.appendChild(make("span", "badge badge-featured", "Featured"));
-    }
+    badges.appendChild(make("span",
+      isActive ? "badge badge-active" : "badge badge-inactive",
+      isActive ? "Active" : "Hidden"));
     body.appendChild(badges);
 
     card.appendChild(body);
 
     var actions = make("div", "list-item-actions");
-    var isActive = p.is_active !== false;
 
     var toggleLabel = make("label", "toggle");
     var cb = document.createElement("input");
@@ -568,7 +511,6 @@
     if (!list) return;
 
     list.textContent = "";
-
     var items = state.products.filter(matchesFilters);
 
     if (!items.length) {
@@ -579,9 +521,7 @@
       return;
     }
 
-    items.forEach(function (p) {
-      list.appendChild(buildProductCard(p));
-    });
+    items.forEach(function (p) { list.appendChild(buildProductCard(p)); });
   }
 
   function wireProductList() {
@@ -591,7 +531,6 @@
     list.addEventListener("click", function (e) {
       var t = e.target;
       if (!t || !t.closest) return;
-
       if (t.closest(".toggle")) return;
 
       var btn = t.closest("[data-action]");
@@ -624,35 +563,36 @@
     var cat = $("productFilterCategory");
     var status = $("productFilterStatus");
 
-    if (search) {
-      search.addEventListener("input", function () {
-        state.filters.search = search.value.trim();
-        renderProducts();
-      });
-    }
-
-    if (cat) {
-      cat.addEventListener("change", function () {
-        state.filters.category = cat.value;
-        renderProducts();
-      });
-    }
-
-    if (status) {
-      status.addEventListener("change", function () {
-        state.filters.status = status.value;
-        renderProducts();
-      });
-    }
+    if (search) search.addEventListener("input", function () {
+      state.filters.search = search.value.trim();
+      renderProducts();
+    });
+    if (cat) cat.addEventListener("change", function () {
+      state.filters.category = cat.value;
+      renderProducts();
+    });
+    if (status) status.addEventListener("change", function () {
+      state.filters.status = status.value;
+      renderProducts();
+    });
   }
 
   async function setProductActive(id, active, input) {
     try {
-      var res = await state.sb
-        .from("products")
+      var res = await state.sb.from("products")
         .update({ is_active: !!active })
         .eq("id", id);
-      if (res.error) throw res.error;
+
+      if (res.error) {
+        var msg = friendly(res.error);
+        // If the products table doesn't have an is_active column, tell the user once.
+        if (/is_active/i.test(msg) || /column .* does not exist/i.test(msg)) {
+          if (input) { input.checked = !active; input.disabled = true; }
+          toast("This project's products table has no 'is_active' column.", "error");
+          return;
+        }
+        throw res.error;
+      }
 
       var p = state.products.find(function (x) {
         return String(x.id) === String(id);
@@ -681,7 +621,6 @@
     var p = state.products.find(function (x) {
       return String(x.id) === String(id);
     });
-
     var label = p
       ? (p.name || "Untitled") + (p.code ? " (" + p.code + ")" : "")
       : "this product";
@@ -698,12 +637,11 @@
       var res = await state.sb.from("products").delete().eq("id", id);
       if (res.error) throw res.error;
 
+      // Best-effort: remove its images from storage too.
       if (p) {
         var urls = [];
         if (p.main_image) urls.push(p.main_image);
-        (p.additional_images || []).forEach(function (u) {
-          if (u) urls.push(u);
-        });
+        readImages(p.additional_images).forEach(function (u) { urls.push(u); });
         urls.forEach(function (u) { deleteStorageFile(u); });
       }
 
@@ -716,9 +654,87 @@
     }
   }
 
-  /* ------------------------------------------------------------------
-     Image helpers
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Data format helpers
+     --------------------------------------------------------------------
+     Existing projects may store sizes and additional_images as:
+       - a Postgres array  (supabase-js returns it as a JS array)
+       - a JSONB array     (also returned as a JS array)
+       - a text column     (returned as a string; might hold JSON or a CSV)
+     We READ all of those safely, and when WRITING we try to keep the
+     same style as the data already stored in the table.
+     -------------------------------------------------------------------- */
+
+  function readSizes(v) {
+    if (Array.isArray(v)) return v.map(String);
+    if (typeof v === "string") {
+      var t = v.trim();
+      if (!t) return [];
+      if (t.charAt(0) === "[") {
+        try {
+          var p = JSON.parse(t);
+          if (Array.isArray(p)) return p.map(String);
+        } catch (e) { /* fall through */ }
+      }
+      return t.split(",").map(function (x) { return String(x).trim(); }).filter(Boolean);
+    }
+    return [];
+  }
+
+  function readImages(v) {
+    if (Array.isArray(v)) return v.map(String);
+    if (typeof v === "string") {
+      var t = v.trim();
+      if (!t) return [];
+      if (t.charAt(0) === "[") {
+        try {
+          var p = JSON.parse(t);
+          if (Array.isArray(p)) return p.map(String);
+        } catch (e) { /* fall through */ }
+      }
+      return t.split(/[,\n]/).map(function (x) { return String(x).trim(); }).filter(Boolean);
+    }
+    return [];
+  }
+
+  // Look at any existing product to see how the table stores a field.
+  function detectSampleValue(fieldName) {
+    for (var i = 0; i < state.products.length; i++) {
+      var v = state.products[i] && state.products[i][fieldName];
+      if (v != null) return v;
+    }
+    return null;
+  }
+
+  // Decide how to write `additional_images`: array, JSON string or CSV string.
+  function encodeImagesForWrite(arr) {
+    var sample = detectSampleValue("additional_images");
+    if (Array.isArray(sample)) return arr;
+    if (typeof sample === "string") {
+      var t = sample.trim();
+      if (!t) return arr; // empty string tells us nothing → default to array
+      if (t.charAt(0) === "[") return JSON.stringify(arr);   // JSON string
+      // Otherwise treat as CSV string.
+      return arr.join(",");
+    }
+    return arr; // default
+  }
+
+  function encodeSizesForWrite(arr) {
+    var sample = detectSampleValue("sizes");
+    if (Array.isArray(sample)) return arr;
+    if (typeof sample === "string") {
+      var t = sample.trim();
+      if (!t) return arr;
+      if (t.charAt(0) === "[") return JSON.stringify(arr);
+      return arr.join(",");
+    }
+    return arr;
+  }
+
+  /* --------------------------------------------------------------------
+     Image helpers: public URL <-> storage path, delete, validate, compress
+     -------------------------------------------------------------------- */
   function bucketBase() {
     var url = (window.VIONA_CONFIG && window.VIONA_CONFIG.SUPABASE_URL) || "";
     url = String(url).replace(/\/+$/, "");
@@ -730,11 +746,9 @@
     var s = String(u);
     var base = bucketBase();
     if (s.indexOf(base) !== 0) return null;
-
     var p = s.slice(base.length);
     p = p.split("?")[0].split("#")[0];
     if (!p) return null;
-
     try { p = decodeURIComponent(p); } catch (e) { /* keep raw */ }
     return p;
   }
@@ -744,7 +758,7 @@
       var path = pathFromPublicUrl(url);
       if (!path || !state.sb) return;
       await state.sb.storage.from(BUCKET).remove([path]);
-    } catch (e) { /* best effort */ }
+    } catch (e) { /* best effort, ignore */ }
   }
 
   function validateImageFile(file) {
@@ -753,7 +767,7 @@
       return "Only image files (JPG, PNG, WEBP) are allowed.";
     }
     if (file.size > MAX_FILE_BYTES) {
-      return "That image is larger than 8 MB. Please choose a smaller file.";
+      return "That image is larger than 5 MB. Please choose a smaller file.";
     }
     return null;
   }
@@ -835,19 +849,14 @@
     return url;
   }
 
-  /* ------------------------------------------------------------------
-     Product modal
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Product modal: main photo + extras, form reset, open/close
+     -------------------------------------------------------------------- */
   function setUploadStatus(msg) {
     var el = $("uploadStatus");
     if (!el) return;
-    if (msg) {
-      el.textContent = msg;
-      showEl(el);
-    } else {
-      el.textContent = "";
-      hideEl(el);
-    }
+    if (msg) { el.textContent = msg; showEl(el); }
+    else { el.textContent = ""; hideEl(el); }
   }
 
   function setSaveDisabled(on) {
@@ -947,35 +956,22 @@
   }
 
   function resetProductForm() {
-    ["pName", "pCode", "pPrice", "pDescription", "pWhatsapp", "pExtraSizes"].forEach(function (id) {
-      var el = $(id);
-      if (el) el.value = "";
-    });
+    ["pName", "pCode", "pPrice", "pDescription", "pWhatsapp", "pExtraSizes", "pMeeshoLink"]
+      .forEach(function (id) {
+        var el = $(id);
+        if (el) el.value = "";
+      });
 
-    var cat = $("pCategory");
-    if (cat) cat.value = "";
-
-    var st = $("pStockStatus");
-    if (st) st.value = "in_stock";
-
-    var act = $("pIsActive");
-    if (act) act.checked = true;
-
-    var feat = $("pIsFeatured");
-    if (feat) feat.checked = false;
+    var cat = $("pCategory"); if (cat) cat.value = "";
+    var act = $("pIsActive"); if (act) act.checked = true;
 
     $$("#pSizeChecks input[type=checkbox]").forEach(function (cb) {
       cb.checked = false;
     });
 
-    var link = $("pMainImageUrl");
-    if (link) link.value = "";
-
-    var mainInput = $("mainPhotoInput");
-    if (mainInput) mainInput.value = "";
-
-    var moreInput = $("morePhotosInput");
-    if (moreInput) moreInput.value = "";
+    var link = $("pMainImageUrl"); if (link) link.value = "";
+    var mainInput = $("mainPhotoInput"); if (mainInput) mainInput.value = "";
+    var moreInput = $("morePhotosInput"); if (moreInput) moreInput.value = "";
 
     setMainImage("");
     setAdditionalImages([]);
@@ -1002,17 +998,14 @@
   }
 
   function setSizesToForm(sizes) {
-    var list = Array.isArray(sizes) ? sizes.map(String) : [];
+    var list = readSizes(sizes);
     var known = ["2.2", "2.4", "2.6", "2.8", "2.10"];
 
     $$("#pSizeChecks input[type=checkbox]").forEach(function (cb) {
       cb.checked = list.indexOf(cb.value) !== -1;
     });
 
-    var extras = list.filter(function (s) {
-      return known.indexOf(s) === -1;
-    });
-
+    var extras = list.filter(function (s) { return known.indexOf(s) === -1; });
     var extraEl = $("pExtraSizes");
     if (extraEl) extraEl.value = extras.join(", ");
   }
@@ -1032,9 +1025,7 @@
       uploads: [],
       original: p ? {
         main_image: p.main_image || "",
-        additional_images: Array.isArray(p.additional_images)
-          ? p.additional_images.slice()
-          : []
+        additional_images: readImages(p.additional_images)
       } : null,
       saved: false
     };
@@ -1057,20 +1048,14 @@
       if (priceEl) priceEl.value = (p.price == null ? "" : String(p.price));
       var descEl = $("pDescription");
       if (descEl) descEl.value = p.description || "";
-      var stEl = $("pStockStatus");
-      if (stEl) stEl.value = p.stock_status || "in_stock";
-      var waEl = $("pWhatsapp");
-      if (waEl) waEl.value = p.whatsapp || "";
+      var waEl = $("pWhatsapp"); if (waEl) waEl.value = p.whatsapp || "";
+      var mlEl = $("pMeeshoLink"); if (mlEl) mlEl.value = p.meesho_link || "";
       var actEl = $("pIsActive");
       if (actEl) actEl.checked = p.is_active !== false;
-      var featEl = $("pIsFeatured");
-      if (featEl) featEl.checked = !!p.is_featured;
 
       setSizesToForm(p.sizes);
       setMainImage(p.main_image || "");
-      setAdditionalImages(
-        Array.isArray(p.additional_images) ? p.additional_images.slice() : []
-      );
+      setAdditionalImages(readImages(p.additional_images));
     } else {
       if (titleEl) titleEl.textContent = "New product";
       if (subEl) subEl.textContent = "Fill in the details below.";
@@ -1078,7 +1063,6 @@
     }
 
     openModal("productModal");
-
     setTimeout(function () {
       var n = $("pName");
       if (n) n.focus();
@@ -1090,6 +1074,7 @@
     state.modalSession = null;
     if (!sess) return;
 
+    // If the user uploaded photos but closed without saving, delete them.
     if (!sess.saved && Array.isArray(sess.uploads) && sess.uploads.length) {
       sess.uploads.forEach(function (u) { deleteStorageFile(u); });
     }
@@ -1099,9 +1084,9 @@
     setUploadStatus("");
   }
 
-  /* ------------------------------------------------------------------
-     Product modal — photo uploads
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Photo upload wiring (main + extras)
+     -------------------------------------------------------------------- */
   function wirePhotoUploads() {
     var mainInput = $("mainPhotoInput");
     if (mainInput) {
@@ -1124,11 +1109,7 @@
     }
 
     var rm = $("mainPhotoRemove");
-    if (rm) {
-      rm.addEventListener("click", function () {
-        setMainImage("");
-      });
-    }
+    if (rm) rm.addEventListener("click", function () { setMainImage(""); });
 
     var link = $("pMainImageUrl");
     if (link) {
@@ -1142,11 +1123,7 @@
         var lbl = $("mainPhotoBtnLabel");
 
         if (v) {
-          if (prev) {
-            prev.onerror = null;
-            prev.src = v;
-            showEl(prev);
-          }
+          if (prev) { prev.onerror = null; prev.src = v; showEl(prev); }
           if (empty) hideEl(empty);
           if (rmBtn) showEl(rmBtn);
           if (lbl) lbl.textContent = "Change main photo";
@@ -1166,10 +1143,7 @@
 
   async function uploadMainPhoto(file) {
     var problem = validateImageFile(file);
-    if (problem) {
-      toast(problem, "error");
-      return;
-    }
+    if (problem) { toast(problem, "error"); return; }
 
     beginUpload();
     setUploadStatus("Uploading main photo…");
@@ -1177,10 +1151,8 @@
     try {
       var blob = await compressImage(file);
       var url = await uploadImage(blob);
-
       if (state.modalSession) state.modalSession.uploads.push(url);
       setMainImage(url);
-
       setUploadStatus("");
       toast("Main photo uploaded.", "success");
     } catch (err) {
@@ -1197,7 +1169,6 @@
       toast("You can add up to " + MAX_MORE_PHOTOS + " extra photos.", "error");
       return;
     }
-
     if (files.length > room) {
       toast("Only " + room + " more photo" + (room === 1 ? "" : "s") + " can be added.", "error");
       files = files.slice(0, room);
@@ -1207,12 +1178,8 @@
 
     for (var i = 0; i < total; i++) {
       var file = files[i];
-
       var problem = validateImageFile(file);
-      if (problem) {
-        toast(problem, "error");
-        continue;
-      }
+      if (problem) { toast(problem, "error"); continue; }
 
       beginUpload();
       setUploadStatus("Uploading photo " + (i + 1) + " of " + total + "…");
@@ -1220,9 +1187,7 @@
       try {
         var blob = await compressImage(file);
         var url = await uploadImage(blob);
-
         if (state.modalSession) state.modalSession.uploads.push(url);
-
         if (state.additionalImages.length < MAX_MORE_PHOTOS) {
           state.additionalImages.push(url);
           renderMorePhotos();
@@ -1238,36 +1203,64 @@
     toast("Photo" + (total === 1 ? "" : "s") + " uploaded.", "success");
   }
 
-  /* ------------------------------------------------------------------
-     Product modal — save
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Save product: build payload, insert/update, auto-assign code,
+     clean up unused images.
+     -------------------------------------------------------------------- */
+
+  // Extract the missing column name from a PostgREST error, if any.
+  function extractMissingColumn(err) {
+    var msg = friendly(err);
+    var m = msg.match(/column ["']?([a-zA-Z_][a-zA-Z0-9_]*)["']? (?:of relation|does not exist)/i);
+    if (m) return m[1];
+    m = msg.match(/Could not find the '([a-zA-Z_][a-zA-Z0-9_]*)' column/i);
+    if (m) return m[1];
+    return null;
+  }
+
+  // Insert/update, stripping any column the DB says it doesn't know about.
+  async function safeWrite(mode, payload, id) {
+    var p = {};
+    Object.keys(payload).forEach(function (k) { p[k] = payload[k]; });
+
+    for (var attempt = 0; attempt < 20; attempt++) {
+      var res;
+      if (mode === "insert") {
+        res = await state.sb.from("products").insert(p).select().single();
+      } else {
+        res = await state.sb.from("products").update(p).eq("id", id).select().single();
+      }
+      if (!res.error) return res;
+
+      var badCol = extractMissingColumn(res.error);
+      if (!badCol || p[badCol] === undefined) return res;   // Not a column error → bail
+
+      console.warn("[admin] products table has no column \"" + badCol + "\" — skipping it.");
+      delete p[badCol];
+    }
+    return { error: { message: "Could not save: too many unknown columns." } };
+  }
+
   async function cleanupUnusedImages(savedProduct) {
     var keep = {};
 
     if (savedProduct) {
       if (savedProduct.main_image) keep[savedProduct.main_image] = true;
-      (savedProduct.additional_images || []).forEach(function (u) {
+      readImages(savedProduct.additional_images).forEach(function (u) {
         if (u) keep[u] = true;
       });
     }
-
     if (state.mainImage) keep[state.mainImage] = true;
-    state.additionalImages.forEach(function (u) {
-      if (u) keep[u] = true;
-    });
+    state.additionalImages.forEach(function (u) { if (u) keep[u] = true; });
 
     var candidates = [];
-
     if (state.modalSession && Array.isArray(state.modalSession.uploads)) {
       candidates = candidates.concat(state.modalSession.uploads);
     }
-
     var orig = state.modalSession && state.modalSession.original;
     if (orig) {
       if (orig.main_image) candidates.push(orig.main_image);
-      (orig.additional_images || []).forEach(function (u) {
-        if (u) candidates.push(u);
-      });
+      (orig.additional_images || []).forEach(function (u) { if (u) candidates.push(u); });
     }
 
     var seen = {};
@@ -1303,7 +1296,6 @@
       showProductError("Please enter a valid price.");
       return;
     }
-
     var price = Number(priceRaw);
     if (!(price > 0)) {
       showProductError("Price must be a positive number.");
@@ -1313,28 +1305,26 @@
     var codeEl = $("pCode");
     var code = codeEl ? String(codeEl.value || "").trim() : "";
 
+    var descEl = $("pDescription");
+    var waEl = $("pWhatsapp");
+    var mlEl = $("pMeeshoLink");
+    var actEl = $("pIsActive");
+
+    var sizesArr = sizesFromForm();
+    var extrasArr = state.additionalImages.slice();
+
     var payload = {
       name: name,
       code: code || null,
       category: category,
       price: price,
-      sizes: sizesFromForm(),
-      description: (function () {
-        var d = $("pDescription");
-        return d ? (String(d.value || "").trim() || null) : null;
-      })(),
+      sizes: encodeSizesForWrite(sizesArr),
+      description: descEl ? (String(descEl.value || "").trim() || null) : null,
       main_image: state.mainImage || null,
-      additional_images: state.additionalImages.slice(),
-      whatsapp: (function () {
-        var w = $("pWhatsapp");
-        return w ? (String(w.value || "").trim() || null) : null;
-      })(),
-      is_active: !!(function () { var a = $("pIsActive"); return a && a.checked; })(),
-      is_featured: !!(function () { var f = $("pIsFeatured"); return f && f.checked; })(),
-      stock_status: (function () {
-        var s = $("pStockStatus");
-        return (s && s.value) ? s.value : "in_stock";
-      })()
+      additional_images: encodeImagesForWrite(extrasArr),
+      meesho_link: mlEl ? (String(mlEl.value || "").trim() || null) : null,
+      whatsapp: waEl ? (String(waEl.value || "").trim() || null) : null,
+      is_active: !!(actEl && actEl.checked)
     };
 
     busy(true);
@@ -1344,30 +1334,19 @@
       var saved = null;
 
       if (id != null) {
-        var upd = await state.sb
-          .from("products")
-          .update(payload)
-          .eq("id", id)
-          .select()
-          .single();
-
+        var upd = await safeWrite("update", payload, id);
         if (upd.error) throw upd.error;
         saved = upd.data;
         toast("Product updated.", "success");
       } else {
-        var ins = await state.sb
-          .from("products")
-          .insert(payload)
-          .select()
-          .single();
-
+        var ins = await safeWrite("insert", payload, null);
         if (ins.error) throw ins.error;
         saved = ins.data;
 
-        if (!code && saved && saved.id != null) {
+        // Auto-assign code if user left it blank and the products table has a `code` column.
+        if (!code && saved && saved.id != null && "code" in saved) {
           var autoCode = "VB-" + String(saved.id).padStart(3, "0");
-          var upd2 = await state.sb
-            .from("products")
+          var upd2 = await state.sb.from("products")
             .update({ code: autoCode })
             .eq("id", saved.id);
           if (!upd2.error) saved.code = autoCode;
@@ -1393,9 +1372,9 @@
     }
   }
 
-  /* ------------------------------------------------------------------
-     Settings — load / save
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Settings (site_settings key/value)
+     -------------------------------------------------------------------- */
   function updateOfferCounter() {
     var ta = $("setOfferText");
     var out = $("offerTextCount");
@@ -1403,7 +1382,7 @@
   }
 
   function updateBannerPreview() {
-    var sw = $("setOfferActive");
+    var sw = $("setOfferEnabled");
     var ta = $("setOfferText");
     var wrap = $("bannerPreview");
     var txt = $("bannerPreviewText");
@@ -1423,32 +1402,19 @@
   function applySettingsToForm(map) {
     map = map || {};
 
-    var sw = $("setOfferActive");
-    if (sw) sw.checked = String(map.offer_active || "").toLowerCase() === "true";
+    var sw = $("setOfferEnabled");
+    if (sw) sw.checked = String(map.offer_enabled || "").toLowerCase() === "true";
 
     var ta = $("setOfferText");
     if (ta) ta.value = map.offer_text || "";
 
-    var wa = $("setWhatsapp");
-    if (wa) wa.value = map.whatsapp_number || "";
-
-    var ph = $("setPhone");
-    if (ph) ph.value = map.phone || "";
-
-    var em = $("setEmail");
-    if (em) em.value = map.contact_email || "";
-
-    var ad = $("setAddress");
-    if (ad) ad.value = map.address || "";
-
-    var dn = $("setDeliveryNote");
-    if (dn) dn.value = map.delivery_note || "";
-
-    var ig = $("setInstagram");
-    if (ig) ig.value = map.instagram_url || "";
-
-    var fb = $("setFacebook");
-    if (fb) fb.value = map.facebook_url || "";
+    var wa = $("setWhatsapp"); if (wa) wa.value = map.whatsapp_number || "";
+    var ph = $("setPhone");    if (ph) ph.value = map.phone || "";
+    var em = $("setEmail");    if (em) em.value = map.contact_email || "";
+    var ad = $("setAddress");  if (ad) ad.value = map.address || "";
+    var dn = $("setDeliveryNote"); if (dn) dn.value = map.delivery_note || "";
+    var ig = $("setInstagram"); if (ig) ig.value = map.instagram_url || "";
+    var fb = $("setFacebook"); if (fb) fb.value = map.facebook_url || "";
 
     updateOfferCounter();
     updateBannerPreview();
@@ -1456,17 +1422,14 @@
 
   async function loadSettings() {
     if (!state.sb) return;
-
     busy(true);
     try {
       var res = await state.sb.from("site_settings").select("key,value");
       if (res.error) throw res.error;
-
       var map = {};
       (res.data || []).forEach(function (row) {
         if (row && row.key != null) map[row.key] = row.value;
       });
-
       applySettingsToForm(map);
     } catch (err) {
       toast(friendly(err) || "Could not load settings.", "error");
@@ -1480,15 +1443,12 @@
 
     var waEl = $("setWhatsapp");
     var wa = waEl ? String(waEl.value || "").replace(/\D/g, "") : "";
-
     if (wa && (wa.length < 10 || wa.length > 15)) {
       toast("WhatsApp number must be 10 to 15 digits, including country code.", "error");
       return;
     }
 
-    var now = new Date().toISOString();
-
-    var offerActive = $("setOfferActive");
+    var offerEnabled = $("setOfferEnabled");
     var offerText = $("setOfferText");
     var phone = $("setPhone");
     var email = $("setEmail");
@@ -1497,24 +1457,22 @@
     var instagram = $("setInstagram");
     var facebook = $("setFacebook");
 
+    // Keys must match what the public website reads.
     var rows = [
-      { key: "offer_active", value: (offerActive && offerActive.checked) ? "true" : "false", updated_at: now },
-      { key: "offer_text", value: offerText ? String(offerText.value || "") : "", updated_at: now },
-      { key: "whatsapp_number", value: wa, updated_at: now },
-      { key: "delivery_note", value: delivery ? String(delivery.value || "") : "", updated_at: now },
-      { key: "phone", value: phone ? String(phone.value || "") : "", updated_at: now },
-      { key: "contact_email", value: email ? String(email.value || "") : "", updated_at: now },
-      { key: "address", value: address ? String(address.value || "") : "", updated_at: now },
-      { key: "instagram_url", value: instagram ? String(instagram.value || "") : "", updated_at: now },
-      { key: "facebook_url", value: facebook ? String(facebook.value || "") : "", updated_at: now }
+      { key: "offer_enabled",   value: (offerEnabled && offerEnabled.checked) ? "true" : "false" },
+      { key: "offer_text",      value: offerText ? String(offerText.value || "") : "" },
+      { key: "whatsapp_number", value: wa },
+      { key: "delivery_note",   value: delivery ? String(delivery.value || "") : "" },
+      { key: "phone",           value: phone ? String(phone.value || "") : "" },
+      { key: "contact_email",   value: email ? String(email.value || "") : "" },
+      { key: "address",         value: address ? String(address.value || "") : "" },
+      { key: "instagram_url",   value: instagram ? String(instagram.value || "") : "" },
+      { key: "facebook_url",    value: facebook ? String(facebook.value || "") : "" }
     ];
 
     busy(true);
     try {
-      var res = await state.sb
-        .from("site_settings")
-        .upsert(rows, { onConflict: "key" });
-
+      var res = await state.sb.from("site_settings").upsert(rows, { onConflict: "key" });
       if (res.error) throw res.error;
 
       toast("Settings saved.", "success");
@@ -1527,15 +1485,13 @@
   }
 
   function wireSettings() {
-    var sw = $("setOfferActive");
+    var sw = $("setOfferEnabled");
     if (sw) sw.addEventListener("change", updateBannerPreview);
 
     var ta = $("setOfferText");
     if (ta) {
       ta.addEventListener("input", function () {
-        if (ta.value.length > OFFER_TEXT_MAX) {
-          ta.value = ta.value.slice(0, OFFER_TEXT_MAX);
-        }
+        if (ta.value.length > OFFER_TEXT_MAX) ta.value = ta.value.slice(0, OFFER_TEXT_MAX);
         updateOfferCounter();
         updateBannerPreview();
       });
@@ -1549,133 +1505,15 @@
       });
     }
 
-    var s1 = $("saveSettingsBtn");
-    if (s1) s1.addEventListener("click", saveSettings);
-
-    var s2 = $("saveSettingsBtn2");
-    if (s2) s2.addEventListener("click", saveSettings);
-
-    var rl = $("reloadSettingsBtn");
-    if (rl) rl.addEventListener("click", function () { loadSettings(); });
+    var s1 = $("saveSettingsBtn");  if (s1) s1.addEventListener("click", saveSettings);
+    var s2 = $("saveSettingsBtn2"); if (s2) s2.addEventListener("click", saveSettings);
+    var rl = $("reloadSettingsBtn"); if (rl) rl.addEventListener("click", function () { loadSettings(); });
   }
 
-  /* ------------------------------------------------------------------
-     Customers (NEW)
-     ------------------------------------------------------------------ */
-  async function loadCustomers() {
-    if (!state.sb || state.loadingCustomers) return;
-    state.loadingCustomers = true;
-
-    var list = $("customersList");
-    if (list) {
-      list.textContent = "";
-      list.appendChild(make("p", "loading-line", "Loading customers…"));
-    }
-
-    try {
-      var res = await state.sb
-        .from("customers")
-        .select("id,name,phone,email,city,created_at,updated_at")
-        .order("created_at", { ascending: false });
-
-      if (res.error) throw res.error;
-
-      state.customers = Array.isArray(res.data) ? res.data : [];
-      state.customersLoaded = true;
-      renderCustomers();
-    } catch (err) {
-      if (list) {
-        list.textContent = "";
-        list.appendChild(make(
-          "p",
-          "loading-line",
-          "Could not load customers. " + (friendly(err) || "")
-        ));
-      }
-    } finally {
-      state.loadingCustomers = false;
-    }
-  }
-
-  function customerMatches(c, q) {
-    if (!q) return true;
-    var hay = [
-      c.name, c.phone, c.email, c.city
-    ].filter(Boolean).join(" ").toLowerCase();
-    return hay.indexOf(q) !== -1;
-  }
-
-  function buildCustomerRow(c) {
-    var row = make("div", "customer-row");
-
-    var left = make("div", "customer-row-left");
-    left.appendChild(make("p", "customer-row-name", c.name || "Unnamed"));
-    if (c.phone) left.appendChild(make("p", "customer-row-line", "Phone: " + c.phone));
-    if (c.email) left.appendChild(make("p", "customer-row-line", "Email: " + c.email));
-    if (c.city)  left.appendChild(make("p", "customer-row-line", "City: " + c.city));
-    row.appendChild(left);
-
-    var right = make("div", "customer-row-right");
-    var joined = c.created_at ? formatDate(c.created_at) : "";
-    right.appendChild(make(
-      "p",
-      "customer-row-joined",
-      joined ? ("Joined " + joined) : ""
-    ));
-    row.appendChild(right);
-
-    return row;
-  }
-
-  function renderCustomers() {
-    var list = $("customersList");
-    var empty = $("customersEmpty");
-    if (!list) return;
-
-    list.textContent = "";
-
-    var q = String(state.customerFilter || "").trim().toLowerCase();
-    var items = state.customers.filter(function (c) { return customerMatches(c, q); });
-
-    if (!items.length) {
-      if (empty) {
-        empty.textContent = state.customers.length
-          ? "No customers match your search."
-          : "No customers yet.";
-        empty.hidden = false;
-      }
-      return;
-    }
-    if (empty) empty.hidden = true;
-
-    items.forEach(function (c) {
-      list.appendChild(buildCustomerRow(c));
-    });
-  }
-
-  function wireCustomers() {
-    var search = $("customerSearch");
-    if (search) {
-      search.addEventListener("input", function () {
-        state.customerFilter = search.value || "";
-        renderCustomers();
-      });
-    }
-
-    var reload = $("reloadCustomersBtn");
-    if (reload) {
-      reload.addEventListener("click", function () {
-        state.customersLoaded = false;
-        loadCustomers();
-      });
-    }
-  }
-
-  /* ------------------------------------------------------------------
-     UI wiring
-     ------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------
+     Wire everything together
+     -------------------------------------------------------------------- */
   function wireUI() {
-    // Auth buttons
     var googleBtn = $("loginGoogleBtn");
     if (googleBtn) googleBtn.addEventListener("click", onLoginGoogleClick);
 
@@ -1685,10 +1523,8 @@
     var notAdminLogout = $("notAdminLogoutBtn");
     if (notAdminLogout) notAdminLogout.addEventListener("click", onLogoutClick);
 
-    // Tabs
     wireTabs();
 
-    // Products
     var newBtn = $("newProductBtn");
     if (newBtn) newBtn.addEventListener("click", function () { openProductModal(null); });
 
@@ -1699,51 +1535,39 @@
     wireProductFilters();
     wirePhotoUploads();
 
-    // Confirm dialog
     var yes = $("confirmYes");
     if (yes) yes.addEventListener("click", function () { closeConfirm(true); });
-
     var no = $("confirmNo");
     if (no) no.addEventListener("click", function () { closeConfirm(false); });
 
-    // Settings
     wireSettings();
-
-    // Customers
-    wireCustomers();
-
-    // Modals
     wireModals();
   }
 
-  /* ------------------------------------------------------------------
+  /* --------------------------------------------------------------------
      Boot
-     ------------------------------------------------------------------ */
+     -------------------------------------------------------------------- */
   async function boot() {
     wireUI();
 
-    // Make sure the login screen is the visible one to start with.
+    // Start on the login screen.
     state.lastScreen = "login";
     showScreen("login");
 
     if (!window.VionaAuth || typeof window.VionaAuth.ready !== "function") {
       showConfigWarning(
-        "auth.js load nahi hui. Page reload karo — ya js/auth.js ko sahi se upload karo."
+        "auth.js did not load. Please reload the page or check that js/auth.js is uploaded."
       );
       disableLoginButton();
       return;
     }
 
     var ready = false;
-    try {
-      ready = await window.VionaAuth.ready();
-    } catch (e) {
-      ready = false;
-    }
+    try { ready = await window.VionaAuth.ready(); } catch (e) { ready = false; }
 
     if (!ready) {
       showConfigWarning(
-        "Supabase config check karo — js/config.js me SUPABASE_URL aur SUPABASE_ANON_KEY sahi hone chahiye."
+        "Supabase config missing. Check js/config.js — SUPABASE_URL and SUPABASE_ANON_KEY must be set."
       );
       disableLoginButton();
       return;
@@ -1751,12 +1575,12 @@
 
     state.sb = window.VionaAuth.client;
     if (!state.sb) {
-      showConfigWarning("Supabase client start nahi hua. Page reload karo.");
+      showConfigWarning("Supabase client did not start. Please reload the page.");
       disableLoginButton();
       return;
     }
 
-    // Clean up OAuth hash params if present after returning from Google.
+    // Clean up any OAuth #access_token in the URL after returning from Google.
     try {
       var h = window.location.hash || "";
       if (h.indexOf("access_token") !== -1 || h.indexOf("error_description") !== -1) {
@@ -1764,7 +1588,7 @@
       }
     } catch (e) { /* ignore */ }
 
-    // React to auth state changes from the shared auth module.
+    // React to auth changes from the shared module.
     window.VionaAuth.onChange(function (user /*, profile */) {
       handleAuthState(user).catch(function (e) {
         console.warn("[admin] auth handling failed:", e);
