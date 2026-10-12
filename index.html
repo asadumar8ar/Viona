@@ -19,25 +19,14 @@
 <!-- Site styles -->
 <link rel="stylesheet" href="css/style.css" />
 
-<!-- Small tweak so the injected Account button sits nicely in the header.
-     Everything else about the account UI is styled by js/auth.js itself. -->
+<!-- Tiny inline tweak so the injected Account button sits nicely in the
+     header on all screen sizes. Everything else about the account UI is
+     styled by js/auth.js itself. -->
 <style>
-  /* On desktop the account button lives in the nav row. */
-  @media (min-width: 900px) {
-    .header-nav #accountMount { margin-left: 4px; }
-  }
-  /* On mobile, put the Account button next to the hamburger so users can
-     reach login without opening the menu. */
-  @media (max-width: 899px) {
-    .header-inner #accountMount {
-      order: 3;
-      margin-left: 8px;
-    }
-    /* Auth button already has its own look; make it a bit tighter on mobile. */
-    .header-inner #accountMount .va-account-btn {
-      padding: 7px 12px;
-      font-size: 12px;
-    }
+  /* On tablet + desktop, the account button lives inside the header row. */
+  @media (min-width: 768px) {
+    .header-nav #accountMount,
+    .header-inner #accountMount { margin-left: 4px; }
   }
 </style>
 </head>
@@ -52,13 +41,19 @@
 
 <!-- ==========================================================================
      SITE HEADER — sticky navy bar
-     Mobile : row 1 = logo + account + hamburger | row 2 = full width search bar
-     Desktop: logo left | big search centre | nav + account right
+     PHONE (<=767px):
+        Row 1 = [ hamburger ]  [ logo CENTER ]  [ account/login RIGHT ]
+        Row 2 = full-width search bar
+        Row 3 = category strip (horizontal scroll, no scrollbar)
+     TABLET (768–1023px):
+        logo left | search flexible centre | account + menu right
+     LAPTOP (>=1024px):
+        Same as current desktop layout (logo left | big search centre | nav + account right)
      ========================================================================== -->
 <header class="site-header" id="siteHeader">
-  <div class="header-inner">
+  <div class="header-inner" id="headerInner">
 
-    <!-- Brand / logo -->
+    <!-- Brand / logo (centred on phone via CSS grid) -->
     <a class="brand" href="#top" aria-label="Viona Bangles home">
       <img src="images/logo-gold.png"
            alt="Viona Bangles"
@@ -68,13 +63,13 @@
       <span class="brand-fallback" id="headerLogoFallback" hidden>Viona</span>
     </a>
 
-    <!-- Mobile hamburger -->
+    <!-- Hamburger — LEFT side on phone, hidden on laptop -->
     <button class="hamburger" id="hamburgerBtn" type="button"
             aria-label="Open menu" aria-expanded="false" aria-controls="headerNav">
       <span></span><span></span><span></span>
     </button>
 
-    <!-- Big rounded search bar -->
+    <!-- Big rounded search bar (full width on phone, centre on laptop) -->
     <div class="search-wrap" id="searchWrap">
       <form class="search-form" id="searchForm" role="search" autocomplete="off">
         <span class="search-icon" aria-hidden="true">
@@ -103,10 +98,19 @@
       <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
     </div>
 
-    <!-- Navigation -->
+    <!-- Account button — js/auth.js mounts itself here.
+         On phone this sits on the RIGHT of the top row (via CSS grid).
+         On laptop it sits inside the nav row. -->
+    <div id="accountMount"></div>
+
+    <!-- Navigation menu. On phone this slides down below the search bar
+         when the hamburger is tapped. On laptop it is the inline nav row. -->
     <nav class="header-nav" id="headerNav" aria-label="Main navigation">
+      <a href="#top" class="nav-link" data-nav-close>Home</a>
       <a href="#collections" class="nav-link" data-nav-close>Collections</a>
+      <a href="#about" class="nav-link" data-nav-close>About</a>
       <a href="#contact" class="nav-link" data-nav-close>Contact</a>
+      <a href="#faq" class="nav-link" data-nav-close>FAQ</a>
       <a class="nav-wa" id="headerWhatsApp" href="#" target="_blank" rel="noopener"
          aria-label="Chat on WhatsApp">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -114,9 +118,6 @@
         </svg>
       </a>
     </nav>
-
-    <!-- Account button — js/auth.js mounts itself here -->
-    <div id="accountMount"></div>
 
   </div>
 
@@ -521,7 +522,9 @@
        1. supabase-js (CDN)
        2. config.js   (defines window.VIONA_CONFIG)
        3. auth.js     (shared login system, mounts Account button, creates
-                       the Supabase client used by script.js via VionaAuth.client)
+                       the Supabase client used by script.js via VionaAuth.client.
+                       Also owns the login / signup / forgot-password / set-new-
+                       password modals.)
        4. script.js   (page logic — calls VionaAuth.init and uses its client)
      ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
