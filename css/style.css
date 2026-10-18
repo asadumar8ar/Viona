@@ -4,9 +4,12 @@
    Fonts:   Playfair Display (headings) · Poppins (body)
 
    Breakpoints
-     phone   : 0    – 767px   (default)
-     tablet  : 768  – 1023px
-     laptop  : 1024px and up
+     phone   : 0    – 767px   (default)   hamburger LEFT | logo CENTRE | login RIGHT, search below
+     tablet  : 768  – 1023px              same layout as phone, slightly bigger sizes
+     laptop  : 1024px and up              logo left, menu centre, search + login right, NO hamburger
+
+   Nav links on phone + tablet live inside the slide-in drawer (#mobileMenu).
+   On laptop the horizontal .header-nav is shown and the drawer is unavailable.
    ============================================================================ */
 
 /* ==========================================================================
@@ -247,13 +250,12 @@ p{ margin: 0 0 1em; }
 /* ==========================================================================
    6. HEADER
    --------------------------------------------------------------------------
-   PHONE (default):
-     Row 1: login / account — aligned to the RIGHT top corner
-     Row 2: logo CENTERED
-     Row 3: nav links — horizontal scroll row
-     Row 4: full-width search
-   TABLET  (>=768px): logo left | search | login | hamburger
-   LAPTOP  (>=1024px): logo left | menu centre | search | login
+   PHONE / TABLET (default, up to 1023px):
+     Row 1: hamburger LEFT  |  Viona logo CENTRED  |  Login/User RIGHT
+     Row 2: full-width search bar
+     The horizontal .header-nav is hidden (its links live in #mobileMenu).
+   LAPTOP (>=1024px, section 24):
+     brand left | horizontal nav centre | search + login right | no hamburger
    ========================================================================== */
 .site-header{
   position: sticky;
@@ -273,13 +275,11 @@ p{ margin: 0 0 1em; }
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   grid-template-areas:
-    "acct  acct  acct"
-    "brand brand brand"
-    "nav   nav   nav"
-    "srch  srch  srch";
+    "menu brand acct"
+    "srch srch  srch";
   align-items: center;
   column-gap: 8px;
-  row-gap: 6px;
+  row-gap: 10px;
 }
 
 /* --- Brand / logo ------------------------------------------------------- */
@@ -309,17 +309,18 @@ p{ margin: 0 0 1em; }
 }
 .brand-fallback.navy{ color: var(--navy); }
 
-/* --- Hamburger — hidden on phone and laptop ----------------------------- */
+/* --- Hamburger — visible on phone + tablet, hidden on laptop ------------- */
 .hamburger{
-  display: none;
-  grid-area: auto;
+  grid-area: menu;
+  justify-self: start;
+  display: grid;
+  place-content: center;
+  gap: 5px;
   width: var(--tap);
   height: var(--tap);
   border: 1px solid rgba(201,162,75,.35);
   border-radius: 10px;
   background: transparent;
-  place-content: center;
-  gap: 5px;
   padding: 0;
   transition: background .2s var(--ease), border-color .2s var(--ease);
 }
@@ -329,11 +330,7 @@ p{ margin: 0 0 1em; }
   width: 20px; height: 1.8px;
   background: var(--gold-2);
   border-radius: 2px;
-  transition: transform .25s var(--ease), opacity .2s var(--ease);
 }
-.hamburger[aria-expanded="true"] span:nth-child(1){ transform: translateY(6.8px) rotate(45deg); }
-.hamburger[aria-expanded="true"] span:nth-child(2){ opacity: 0; }
-.hamburger[aria-expanded="true"] span:nth-child(3){ transform: translateY(-6.8px) rotate(-45deg); }
 
 /* --- Search bar --------------------------------------------------------- */
 .search-wrap{
@@ -557,20 +554,11 @@ p{ margin: 0 0 1em; }
 }
 .user-dropdown-item:hover{ background: var(--ivory-2); }
 
-/* --- Navigation — phone: horizontal scroll row ------------------------- */
+/* --- Horizontal nav — HIDDEN on phone + tablet, shown only on laptop --- */
 .header-nav{
+  display: none;
   grid-area: nav;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  border-top: 1px solid rgba(201,162,75,.22);
-  border-bottom: 1px solid rgba(201,162,75,.22);
-  padding: 2px 0;
 }
-.header-nav::-webkit-scrollbar{ display: none; }
 
 .nav-link{
   flex: 0 0 auto;
@@ -603,7 +591,132 @@ p{ margin: 0 0 1em; }
 .nav-wa:hover{ background: rgba(201,162,75,.16); }
 
 /* ==========================================================================
-   7. CATEGORY STRIP
+   7. MOBILE DRAWER (phone + tablet, up to 1023px)
+   --------------------------------------------------------------------------
+   Slide-in from the left. Navy background, gold links.
+   Open state is toggled by JS: remove `hidden`, add `.is-open` on #mobileMenu,
+   show #menuOverlay. Body scroll is locked via body.no-scroll.
+   ========================================================================== */
+.menu-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgba(8,14,30,.62);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: fadeIn .3s var(--ease);
+}
+
+.mobile-menu{
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 801;
+  width: min(82vw, 340px);
+  background: var(--navy);
+  background-image: linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 100%);
+  color: var(--gold-2);
+  transform: translateX(-100%);
+  transition: transform .3s var(--ease);
+  display: flex;
+  flex-direction: column;
+  padding:
+    calc(18px + var(--safe-t))
+    calc(22px + var(--safe-r))
+    calc(22px + var(--safe-b))
+    calc(22px + var(--safe-l));
+  border-right: 1px solid rgba(201,162,75,.35);
+  box-shadow: 12px 0 40px rgba(0,0,0,.35);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.mobile-menu.is-open{ transform: translateX(0); }
+
+.mobile-menu-close{
+  position: absolute;
+  top: calc(12px + var(--safe-t));
+  right: 12px;
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: 50%;
+  border: 1px solid rgba(201,162,75,.4);
+  background: transparent;
+  color: var(--gold-2);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: background .2s var(--ease);
+}
+.mobile-menu-close svg{ width: 18px; height: 18px; }
+.mobile-menu-close:hover{ background: rgba(201,162,75,.16); }
+
+.mobile-menu-brand{
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: .5px;
+  margin: 4px 0 28px;
+  padding-right: 44px;
+  line-height: 1.2;
+}
+
+.mobile-menu-nav{
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(201,162,75,.25);
+  margin-bottom: 24px;
+}
+
+.mobile-menu-link{
+  display: block;
+  padding: 16px 4px;
+  border-bottom: 1px solid rgba(201,162,75,.22);
+  color: rgba(255,255,255,.92);
+  font-size: 14px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-weight: 500;
+  min-height: var(--tap);
+  transition: color .2s var(--ease), padding-left .2s var(--ease);
+}
+.mobile-menu-link:hover,
+.mobile-menu-link:focus-visible{
+  color: var(--gold-2);
+  padding-left: 10px;
+}
+
+.mobile-menu-wa{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 14px 20px;
+  min-height: var(--tap);
+  background: var(--wa);
+  color: #fff;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 22px rgba(37,211,102,.32);
+  transition: background .2s var(--ease), transform .2s var(--ease);
+}
+.mobile-menu-wa:hover{ background: var(--wa-dark); transform: translateY(-1px); }
+.mobile-menu-wa svg{ width: 18px; height: 18px; }
+
+/* Drawer is never available on laptop */
+@media (min-width: 1024px){
+  .menu-overlay,
+  .mobile-menu{ display: none !important; }
+}
+
+/* ==========================================================================
+   8. CATEGORY STRIP
    ========================================================================== */
 .category-strip{
   background: var(--white);
@@ -642,7 +755,7 @@ p{ margin: 0 0 1em; }
 .cat-chip.is-active{ color: var(--navy); border-bottom-color: var(--gold); font-weight: 600; }
 
 /* ==========================================================================
-   8. BANNER CAROUSEL
+   9. BANNER CAROUSEL
    ========================================================================== */
 .banner-section{ background: var(--ivory); padding: 18px 0 4px; }
 
@@ -745,7 +858,7 @@ p{ margin: 0 0 1em; }
 .banner-dot.is-active{ width: 22px; border-radius: var(--r-pill); background: var(--gold); }
 
 /* ==========================================================================
-   9. HERO
+   10. HERO
    ========================================================================== */
 .hero{
   position: relative;
@@ -802,7 +915,7 @@ p{ margin: 0 0 1em; }
 }
 
 /* ==========================================================================
-   10. TRUST POINTS
+   11. TRUST POINTS
    ========================================================================== */
 .trust{
   background: var(--white);
@@ -828,7 +941,7 @@ p{ margin: 0 0 1em; }
 .trust-mark{ color: var(--gold); font-size: 12px; line-height: 1; }
 
 /* ==========================================================================
-   11. COLLECTIONS + PRODUCT GRID
+   12. COLLECTIONS + PRODUCT GRID
    ========================================================================== */
 .collections{ padding: 44px 0 10px; background: var(--ivory); }
 
@@ -1012,7 +1125,7 @@ p{ margin: 0 0 1em; }
 .empty-text{ font-size: 13.5px; color: var(--muted); margin: 0 0 20px; }
 
 /* ==========================================================================
-   12. STARS
+   13. STARS
    ========================================================================== */
 .stars{
   display: inline-flex;
@@ -1027,7 +1140,7 @@ p{ margin: 0 0 1em; }
 .stars-xl{ font-size: 22px; }
 
 /* ==========================================================================
-   13. ABOUT
+   14. ABOUT
    ========================================================================== */
 .about{
   background: var(--ivory-2);
@@ -1088,7 +1201,7 @@ p{ margin: 0 0 1em; }
 }
 
 /* ==========================================================================
-   14. FAQ
+   15. FAQ
    ========================================================================== */
 .faq{ padding: 48px 0; background: var(--ivory); }
 .faq-list{ max-width: 780px; margin: 0 auto; border-top: 1px solid var(--line); }
@@ -1132,7 +1245,7 @@ p{ margin: 0 0 1em; }
 .faq-a-inner p:last-child{ margin-bottom: 0; }
 
 /* ==========================================================================
-   15. CONTACT
+   16. CONTACT
    ========================================================================== */
 .contact{
   padding: 48px 0 56px;
@@ -1214,7 +1327,7 @@ p{ margin: 0 0 1em; }
 .social-link:hover{ background: rgba(201,162,75,.14); }
 
 /* ==========================================================================
-   16. FOOTER
+   17. FOOTER
    ========================================================================== */
 .site-footer{
   background: var(--navy);
@@ -1278,7 +1391,7 @@ p{ margin: 0 0 1em; }
 .footer-bottom p{ margin: 0; }
 
 /* ==========================================================================
-   17. PRODUCT MODAL
+   18. PRODUCT MODAL
    ========================================================================== */
 .modal{
   position: fixed;
@@ -1515,7 +1628,7 @@ p{ margin: 0 0 1em; }
 .detail-val{ color: var(--navy); text-align: right; }
 
 /* ==========================================================================
-   18. REVIEWS
+   19. REVIEWS
    ========================================================================== */
 .user-chip{
   display: flex;
@@ -1817,7 +1930,7 @@ p{ margin: 0 0 1em; }
 }
 
 /* ==========================================================================
-   19. LIGHTBOX
+   20. LIGHTBOX
    ========================================================================== */
 .lightbox{ position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; }
 .lightbox-backdrop{
@@ -1881,7 +1994,7 @@ p{ margin: 0 0 1em; }
 }
 
 /* ==========================================================================
-   20. POPUP
+   21. POPUP
    ========================================================================== */
 .popup-root{ position: relative; z-index: 1100; }
 
@@ -1965,7 +2078,7 @@ p{ margin: 0 0 1em; }
 .popup-close:hover{ background: rgba(0,0,0,.42); }
 
 /* ==========================================================================
-   21. TOAST
+   22. TOAST
    ========================================================================== */
 .toast{
   position: fixed;
@@ -1990,7 +2103,7 @@ p{ margin: 0 0 1em; }
 .toast.is-visible{ opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ==========================================================================
-   22. AUTH MODALS (login / signup / forgot / reset password)
+   23. AUTH MODALS (login / signup / forgot / reset password)
    ========================================================================== */
 .auth-modal{
   position: fixed;
@@ -2239,78 +2352,29 @@ p{ margin: 0 0 1em; }
 .auth-switch-link:hover{ color: var(--gold); }
 
 /* ==========================================================================
-   23. TABLET — 768px and up
-   Header: logo left | search | login | hamburger
+   24. TABLET — 768px and up (up to 1023px)
+   Same layout as phone; only spacing + sizes grow.
+   Nav stays hidden, hamburger stays visible, drawer remains available.
    ========================================================================== */
-@media (min-width: 768px){
+@media (min-width: 768px) and (max-width: 1023px){
   :root{ --gutter: 22px; --header-pad: 12px; }
 
   .header-inner{
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    grid-template-columns: none;
-    grid-template-areas: none;
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-areas:
+      "menu brand acct"
+      "srch srch  srch";
+    column-gap: 12px;
+    row-gap: 10px;
     padding: var(--header-pad) var(--gutter);
   }
+  .header-logo{ height: 44px; }
+  .hamburger{ width: 46px; height: 46px; }
 
-  .brand{
-    order: 1;
-    justify-self: auto;
-  }
-  .header-logo{ height: 42px; }
-
-  .search-wrap{
-    order: 2;
-    flex: 1 1 auto;
-    min-width: 180px;
-  }
   .search-form{ height: 46px; padding: 0 14px; }
   .search-input{ font-size: 15px; }
 
-  .account-wrap{
-    order: 3;
-    margin-left: auto;
-    justify-self: auto;
-  }
   .login-btn{ padding: 8px 18px; min-height: 38px; }
-
-  .hamburger{
-    order: 4;
-    display: grid;
-    margin-left: 0;
-  }
-
-  /* Nav collapsed — slides down as full-width panel when .is-open */
-  .header-nav{
-    order: 5;
-    flex: 1 1 100%;
-    display: none;
-    flex-direction: column;
-    gap: 0;
-    max-height: 0;
-    overflow: hidden;
-    border-top: 0;
-    border-bottom: 0;
-    padding-top: 10px;
-    margin-top: 4px;
-    transition: max-height .28s var(--ease);
-  }
-  .header-nav.is-open{
-    display: flex;
-    max-height: 480px;
-    border-top: 1px solid rgba(201,162,75,.25);
-  }
-  .nav-link{
-    padding: 14px 4px;
-    border-bottom: 1px solid rgba(255,255,255,.06);
-    justify-content: flex-start;
-  }
-  .nav-wa{
-    margin: 12px 0 0 0;
-    width: 40px; height: 40px;
-  }
 
   /* Grids */
   .product-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; }
@@ -2331,23 +2395,26 @@ p{ margin: 0 0 1em; }
 }
 
 /* ==========================================================================
-   24. LAPTOP — 1024px and up
-   Header: logo left | menu centre | search + login right
+   25. LAPTOP — 1024px and up
+   Header: logo left | horizontal menu centre | search + login right
+   No hamburger. Drawer is unavailable (see rule at section 7).
    ========================================================================== */
 @media (min-width: 1024px){
   :root{ --gutter: 28px; --header-pad: 14px; }
   html{ scroll-padding-top: 120px; }
 
   .header-inner{
+    display: flex;
     flex-wrap: nowrap;
+    align-items: center;
     gap: 20px;
     padding: 14px var(--gutter);
   }
 
-  .brand{ order: 1; }
+  .brand{ order: 1; justify-self: auto; }
   .header-logo{ height: 46px; }
 
-  /* Nav inline, centred between brand and search */
+  /* Horizontal nav inline, centred between brand and search */
   .header-nav{
     order: 2;
     flex: 1 1 auto;
@@ -2358,10 +2425,7 @@ p{ margin: 0 0 1em; }
     gap: 22px;
     padding: 0;
     border: 0;
-    max-height: none;
-    overflow: visible;
     margin: 0;
-    transition: none;
   }
   .nav-link{
     padding: 6px 0;
@@ -2392,8 +2456,9 @@ p{ margin: 0 0 1em; }
   .search-form{ height: 44px; padding: 0 16px; }
   .search-input{ font-size: 14.5px; }
 
-  .account-wrap{ order: 4; margin-left: 0; }
+  .account-wrap{ order: 4; justify-self: auto; }
 
+  /* Hamburger is not shown on laptop */
   .hamburger{ display: none; }
 
   /* Grids */
@@ -2453,14 +2518,14 @@ p{ margin: 0 0 1em; }
 }
 
 /* ==========================================================================
-   25. LARGE DESKTOP — 1200px and up
+   26. LARGE DESKTOP — 1200px and up
    ========================================================================== */
 @media (min-width: 1200px){
   .banner-slide{ min-height: 420px; }
 }
 
 /* ==========================================================================
-   26. REDUCED MOTION
+   27. REDUCED MOTION
    ========================================================================== */
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{
@@ -2472,10 +2537,12 @@ p{ margin: 0 0 1em; }
 }
 
 /* ==========================================================================
-   27. PRINT
+   28. PRINT
    ========================================================================== */
 @media print{
   .site-header,
+  .menu-overlay,
+  .mobile-menu,
   .offer-strip-root,
   .banner-section,
   .hero,
