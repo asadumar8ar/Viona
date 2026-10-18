@@ -1,5 +1,5 @@
 /* ============================================================================
-   Viona Bangles — js/script.js  (Part 2 of 2)
+   Viona Bangles — js/script.js  (Part 3 of 3)
    ----------------------------------------------------------------------------
    Public homepage logic. Plain vanilla JS, no build step.
 
@@ -10,22 +10,23 @@
 
    What it does:
      - Loads products + site_settings from Supabase (defensive: learns columns
-       by doing select * limit 1). Falls back to demo products if not configured.
+       by doing select * limit 1).
+     - Products come ONLY from the Supabase `products` table, showing only rows
+       where is_active is not false. There is NO demo/sample data anywhere:
+       empty results, failures and missing rows never show fake products or
+       fake reviews.
      - Header search + suggestions, category strip, product grid.
      - Product modal with gallery, size chips, WhatsApp order button.
      - Offers banner from site_settings (hidden when empty).
      - Reviews: fetches ALL reviews once, groups by product_id (String compare)
        and computes count/total/average per product.
-       * Product cards show only their own product's rating.
-       * Modal shows a proper summary box with fractional stars + 5 bars.
-     - Review form is wired to VionaAuth:
-       * Logged out  -> "Login to write a review" button.
-       * Logged in   -> stars + comment + optional photo.
-       * One review per user per product (edit instead of insert).
-     - Injects its own CSS so css/style.css does not need to change.
+     - Review form wired to VionaAuth (login required).
+     - Mobile slide-in drawer (#mobileMenu) with overlay / close / Escape.
+     - Injects its own CSS so css/style.css does not need to change for stars
+       and review UI.
      - Shows the REAL Supabase error message on any failure.
 
-   Deep link: #product=VB-001
+   Deep link: #product=VB-001 — opens NOTHING when the product does not exist.
    ============================================================================ */
 
 (function () {
@@ -169,6 +170,10 @@
     productCols: null,      // array of column names (null when table is empty)
     R: null,                // resolved column map
 
+    // Load flags — used to decide the empty-state message.
+    loaded: false,          // true once the products request finished (ok or failed)
+    loadError: false,       // true when the products request failed
+
     settings: {},           // merged settings object (business, hero, about, ...)
 
     // Reviews — all fetched once, grouped by String(product_id)
@@ -204,53 +209,7 @@
   };
 
   /* ==========================================================================
-     4. DEMO PRODUCTS (offline fallback)
-     ========================================================================== */
-
-  var DEMO_PRODUCTS = [
-    { id: 1, name: 'Classic Glass Bangles', category: 'glass', price: 799, old_price: null,
-      sizes: ['2.2','2.4','2.6','2.8'],
-      description: 'Everyday glass bangles with a smooth finish and a comfortable fit.',
-      main_image: '', additional_images: [], is_active: true, featured: true },
-    { id: 2, name: 'Designer Glass Bangles', category: 'glass', price: 799, old_price: null,
-      sizes: ['2.2','2.4','2.6','2.8'],
-      description: 'Designer glass bangles with fine detailing, made for festive days.',
-      main_image: '', additional_images: [], is_active: true, featured: true },
-    { id: 3, name: 'Festive Glass Bangles', category: 'glass', price: 799, old_price: null,
-      sizes: ['2.2','2.4','2.6','2.8'],
-      description: 'Bright festive glass bangles that go beautifully with sarees and lehengas.',
-      main_image: '', additional_images: [], is_active: true, featured: false },
-    { id: 4, name: 'Traditional Kada', category: 'kada', price: 899, old_price: null,
-      sizes: ['2.4','2.6','2.8'],
-      description: 'Traditional kada crafted in Gaya, Bihar with a rich heritage finish.',
-      main_image: '', additional_images: [], is_active: true, featured: false },
-    { id: 5, name: 'Bridal Kundan Bangles', category: 'bridal', price: 1299, old_price: 1599,
-      sizes: ['2.4','2.6'],
-      description: 'Bridal kundan bangles designed for weddings and special family functions.',
-      main_image: '', additional_images: [], is_active: true, featured: false },
-    { id: 6, name: 'Fashion Metal Bangles', category: 'metal', price: 599, old_price: null,
-      sizes: ['2.2','2.4','2.6','2.8'],
-      description: 'Trendy metal bangles for a modern, stylish everyday look.',
-      main_image: '', additional_images: [], is_active: true, featured: false }
-  ];
-
-  var DEMO_FAQS = [
-    { question: 'Do you deliver across India?',
-      answer: 'Yes. We ship to all pin codes in India. Delivery usually takes 3 to 7 working days and shipping is free on prepaid orders.' },
-    { question: 'How do I place an order?',
-      answer: 'Open any bangle, choose your size and tap the WhatsApp button. Send us the product code (for example VB-001) and your address. We confirm the order on WhatsApp.' },
-    { question: 'Which sizes are available?',
-      answer: 'Most bangles come in 2.2, 2.4, 2.6 and 2.8. If you are not sure about your size, message us on WhatsApp and we will help you measure.' },
-    { question: 'Is Cash on Delivery available?',
-      answer: 'Yes, Cash on Delivery is available on most pin codes. Prepaid orders are packed and shipped faster.' },
-    { question: 'Can I return or exchange?',
-      answer: 'Yes. If you receive a damaged or wrong item, contact us within 7 days of delivery with an unboxing video and we will replace or refund it.' },
-    { question: 'Are these real glass bangles?',
-      answer: 'Yes. Our glass bangles are handcrafted in Gaya, Bihar by traditional artisans using the same methods used for generations.' }
-  ];
-
-  /* ==========================================================================
-     5. INJECTED STYLES (so css/style.css needs no change)
+     4. INJECTED STYLES (so css/style.css needs no change)
      ========================================================================== */
 
   function injectStyles() {
@@ -387,7 +346,7 @@
   }
 
   /* ==========================================================================
-     6. LOAD SITE SETTINGS
+     5. LOAD SITE SETTINGS
      ========================================================================== */
 
   async function loadSettings() {
@@ -557,6 +516,7 @@
     var hWa = el('headerWhatsApp'); if (hWa) hWa.href = waLink(waNum, waMsg);
     var heroWa = el('heroWhatsApp'); if (heroWa) heroWa.href = waLink(waNum, waMsg);
     var cWa = el('contactWhatsApp'); if (cWa) cWa.href = waLink(waNum, waMsg);
+    var mWa = el('mobileMenuWhatsApp'); if (mWa) mWa.href = waLink(waNum, waMsg);
 
     var socialWrap = el('contactSocial');
     if (socialWrap) {
@@ -572,7 +532,7 @@
   }
 
   /* ==========================================================================
-     7. PRODUCTS — column detection + load
+     6. PRODUCTS — column detection + load (Supabase only, no demo data)
      ========================================================================== */
 
   function pickCol(cols) {
@@ -595,60 +555,27 @@
     state.productCols = row ? Object.keys(row) : null;
 
     if (!state.productCols) {
+      // Table is empty — remember a generic map so normalizeProduct still works.
       state.R = {
         known: false,
         id: 'id',
         name: 'name',
         price: 'price',
-        old_price: null,
+        old_price: 'old_price',
         category: 'category',
         sizes: 'sizes',
         description: 'description',
         main_image: 'main_image',
-        additional_images: null,
-        code: null,
-        featured: null,
-        is_active: null,
-        created_at: null
+        additional_images: 'additional_images',
+        code: 'code',
+        featured: 'featured',
+        is_active: 'is_active',
+        created_at: 'created_at'
       };
       return state.R;
     }
 
     var cols = state.productCols;
-    state.R = {
-      known: true,
-      id: 'id',
-      name: pickCol.call(null, cols),
-      price: pickCol.call(null, cols),
-      old_price: null,          // not expected in the known schema
-      category: pickCol.call(null, cols),
-      sizes: pickCol.call(null, cols),
-      description: pickCol.call(null, cols),
-      main_image: pickCol.call(null, cols),
-      additional_images: null,
-      code: null,
-      featured: null,
-      is_active: null,
-      created_at: null
-    };
-
-    // Rebuild with proper pick() calls (the above was a shortcut).
-    state.R = {
-      known: true,
-      id: 'id',
-      name: (function () { return pick('name'); })(),
-      price: (function () { return pick('price'); })(),
-      old_price: null,
-      category: (function () { return pick('category'); })(),
-      sizes: (function () { return pick('sizes'); })(),
-      description: (function () { return pick('description'); })(),
-      main_image: (function () { return pick('main_image'); })(),
-      additional_images: null,
-      code: (function () { return pick('code', 'product_code', 'sku'); })(),
-      featured: (function () { return pick('featured', 'is_featured'); })(),
-      is_active: (function () { return pick('is_active', 'active', 'visible'); })(),
-      created_at: (function () { return pick('created_at'); })()
-    };
 
     function pick() {
       for (var i = 0; i < arguments.length; i++) {
@@ -657,13 +584,38 @@
       return null;
     }
 
+    state.R = {
+      known: true,
+      id: 'id',
+      name: pick('name', 'title'),
+      price: pick('price'),
+      old_price: pick('old_price', 'compare_price', 'original_price'),
+      category: pick('category'),
+      sizes: pick('sizes', 'size'),
+      description: pick('description', 'details'),
+      main_image: pick('main_image', 'image_url', 'image'),
+      additional_images: pick('additional_images', 'gallery', 'images'),
+      code: pick('code', 'product_code', 'sku'),
+      featured: pick('featured', 'is_featured'),
+      is_active: pick('is_active', 'active', 'visible'),
+      created_at: pick('created_at')
+    };
+
     console.log('[viona] product columns:', state.productCols);
     return state.R;
   }
 
   async function loadProducts() {
+    state.products = [];
+    state.filtered = [];
+    state.loaded = false;
+    state.loadError = false;
+
+    // No Supabase client -> this IS a load failure. Never show demo data.
     if (!SUPABASE_READY || !sb) {
-      state.products = DEMO_PRODUCTS.map(normalizeDemo).filter(Boolean);
+      logError('loadProducts', 'Supabase is not ready.');
+      state.loadError = true;
+      state.loaded = true;
       return;
     }
 
@@ -673,12 +625,7 @@
 
       var q = sb.from('products').select('*');
 
-      // Only filter by is_active when we actually know that column exists.
-      if (R.known && R.is_active) {
-        q = q.eq(R.is_active, true);
-      }
-
-      // Order by id descending when we do not know the created_at column.
+      // Order by created_at desc when we know it, else by id desc.
       if (R.known && R.created_at) {
         q = q.order(R.created_at, { ascending: false });
       } else if (R.known) {
@@ -693,19 +640,25 @@
       }
 
       var rows = (res && res.data) || [];
-      if (!rows.length) {
-        state.products = DEMO_PRODUCTS.map(normalizeDemo).filter(Boolean);
-      } else {
-        state.products = rows.map(normalizeProduct).filter(Boolean);
-      }
+
+      // Keep only rows where is_active is NOT false.
+      // (Missing / null values are treated as visible.)
+      var visibleRows = rows.filter(function (row) {
+        if (!row) return false;
+        var v = row.is_active;
+        if (v === false || v === 0) return false;
+        if (typeof v === 'string' && v.trim().toLowerCase() === 'false') return false;
+        return true;
+      });
+
+      state.products = visibleRows.map(normalizeProduct).filter(Boolean);
+      state.loaded = true;
     } catch (e) {
       logError('loadProducts', e);
-      state.products = DEMO_PRODUCTS.map(normalizeDemo).filter(Boolean);
+      state.products = [];
+      state.loadError = true;
+      state.loaded = true;
     }
-  }
-
-  function normalizeDemo(p) {
-    return normalizeProduct(p);
   }
 
   function normalizeProduct(p) {
@@ -720,7 +673,9 @@
     var price = (R.price && row[R.price] != null) ? Number(row[R.price]) : Number(row.price || 0);
 
     var oldPrice = null;
-    if (row.old_price != null && row.old_price !== '') oldPrice = Number(row.old_price);
+    var oldRaw = (R.old_price && row[R.old_price] != null) ? row[R.old_price] : row.old_price;
+    if (oldRaw != null && oldRaw !== '') oldPrice = Number(oldRaw);
+    if (isNaN(oldPrice)) oldPrice = null;
 
     var sizesRaw = (R.sizes && row[R.sizes] != null) ? row[R.sizes] : row.sizes;
     var sizes;
@@ -736,7 +691,9 @@
     var mainImage = (R.main_image && row[R.main_image] != null) ? String(row[R.main_image]) : String(row.main_image || '');
 
     var more = [];
-    var moreRaw = row.additional_images;
+    var moreRaw = (R.additional_images && row[R.additional_images] != null)
+      ? row[R.additional_images]
+      : row.additional_images;
     if (Array.isArray(moreRaw)) {
       more = moreRaw.filter(Boolean).map(String);
     } else if (typeof moreRaw === 'string' && moreRaw.trim()) {
@@ -760,7 +717,7 @@
       additional_images: more,
       code: code,
       is_active: true,
-      featured: false,
+      featured: !!(R.featured ? row[R.featured] : row.featured),
       created_at: row.created_at || null
     };
   }
@@ -778,7 +735,7 @@
   }
 
   /* ==========================================================================
-     8. CATEGORY STRIP
+     7. CATEGORY STRIP
      ========================================================================== */
 
   function buildCategories() {
@@ -814,7 +771,7 @@
   }
 
   /* ==========================================================================
-     9. REVIEWS — fetch once, group by product_id
+     8. REVIEWS — fetch once, group by product_id
      ========================================================================== */
 
   function reviewStatsFor(productId) {
@@ -833,7 +790,6 @@
     });
 
     var avg = total ? (sum / total) : 0;
-    // round to 1 decimal
     avg = Math.round(avg * 10) / 10;
 
     return { stats: stats, total: total, average: avg, list: list };
@@ -859,7 +815,6 @@
       var rows = (res && res.data) || [];
       state.allReviews = rows;
 
-      // Group by String(product_id) so 1 and "1" end up together.
       rows.forEach(function (r) {
         var key = String(r.product_id);
         if (!state.reviewsByProduct[key]) state.reviewsByProduct[key] = [];
@@ -882,8 +837,6 @@
     return null;
   }
 
-  /* ---------- HTML for a star row with fractional fill ---------- */
-
   function starsRowHtml(average, size) {
     var pct = Math.max(0, Math.min(100, (Number(average) || 0) / 5 * 100));
     var fs = size || 15;
@@ -896,7 +849,6 @@
   }
 
   function starsSolidHtml(rating) {
-    // For the reviews list we show whole stars (a review's own rating).
     var r = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
     var on = '';
     for (var i = 1; i <= 5; i++) {
@@ -906,7 +858,7 @@
   }
 
   /* ==========================================================================
-     10. PRODUCT GRID
+     9. PRODUCT GRID + EMPTY STATES
      ========================================================================== */
 
   function applyFilters() {
@@ -928,6 +880,15 @@
     renderGrid();
   }
 
+  function setEmptyState(title, text, showReset) {
+    var titleEl = el('emptyTitle');
+    var textEl = el('emptyText');
+    var resetBtn = el('emptyReset');
+    if (titleEl) titleEl.textContent = title;
+    if (textEl) textEl.textContent = text;
+    if (resetBtn) resetBtn.hidden = !showReset;
+  }
+
   function renderGrid() {
     var grid = el('productGrid');
     var emptyBox = el('emptyBox');
@@ -938,15 +899,35 @@
     if (!grid) return;
 
     var list = state.filtered;
+    var hasProducts = state.products.length > 0;
 
+    // "Showing N bangles" line — hidden when there are no products at all.
     if (showing) {
-      var count = list.length;
-      showing.textContent = 'Showing ' + count + ' ' + (count === 1 ? 'bangle' : 'bangles');
+      if (!hasProducts) {
+        showing.hidden = true;
+        showing.textContent = 'Showing 0 bangles';
+      } else {
+        showing.hidden = false;
+        var count = list.length;
+        showing.textContent = 'Showing ' + count + ' ' + (count === 1 ? 'bangle' : 'bangles');
+      }
     }
 
     if (!list.length) {
       grid.innerHTML = '';
-      if (emptyBox) emptyBox.hidden = false;
+      if (emptyBox) {
+        emptyBox.hidden = false;
+        if (state.loadError) {
+          // Supabase failed — never show demo data.
+          setEmptyState('Could not load products.', 'Please refresh the page.', false);
+        } else if (!hasProducts) {
+          // Loaded fine, but there are simply no products.
+          setEmptyState('No products available right now.', 'Please check back soon.', false);
+        } else {
+          // Products exist, but this filter/search has no match.
+          setEmptyState('No products found.', 'Try another category or search.', true);
+        }
+      }
       return;
     }
 
@@ -1022,7 +1003,7 @@
   }
 
   /* ==========================================================================
-     11. SEARCH + LIVE SUGGESTIONS
+     10. SEARCH + LIVE SUGGESTIONS
      ========================================================================== */
 
   function setupSearch() {
@@ -1195,12 +1176,13 @@
   }
 
   /* ==========================================================================
-     12. PRODUCT MODAL
+     11. PRODUCT MODAL
      ========================================================================== */
 
   var lastFocusedBeforeModal = null;
 
   function openProductById(id) {
+    // Never open anything if the product is not in the real product list.
     var product = state.products.find(function (p) { return Number(p.id) === Number(id); });
     if (!product) return;
     openProduct(product);
@@ -1236,7 +1218,6 @@
     renderDetailRows(product);
     switchTab('details');
 
-    // Rating badge in the tabs row + summary + list + form
     renderModalRatingBadge();
     renderReviewSummary();
     renderReviewList();
@@ -1496,7 +1477,7 @@
   }
 
   /* ==========================================================================
-     13. RATING UI — tab badge + summary box
+     12. RATING UI — tab badge + summary box
      ========================================================================== */
 
   function updateTabReviewCount() {
@@ -1527,7 +1508,6 @@
 
     var stats = reviewStatsFor(state.currentProduct.id);
 
-    // Big average + "out of 5" + fractional stars + total.
     var bigAvg = el('reviewsAverage');
     if (bigAvg) bigAvg.textContent = stats.total ? stats.average.toFixed(1) : '0.0';
 
@@ -1559,7 +1539,6 @@
     }
     barsWrap.innerHTML = html;
 
-    // Animate the fills on the next frame so the transition runs.
     requestAnimationFrame(function () {
       Array.prototype.forEach.call(barsWrap.querySelectorAll('.vrt-bar-fill'), function (fill) {
         var w = Number(fill.getAttribute('data-w')) || 0;
@@ -1569,7 +1548,7 @@
   }
 
   /* ==========================================================================
-     14. REVIEWS LIST
+     13. REVIEWS LIST
      ========================================================================== */
 
   function renderReviewList() {
@@ -1676,7 +1655,7 @@
   }
 
   /* ==========================================================================
-     15. REVIEWS FORM (login / write / edit)
+     14. REVIEWS FORM (login / write / edit)
      ========================================================================== */
 
   function clearReviewFile() {
@@ -1961,7 +1940,6 @@
       btn.textContent = 'Saving…';
 
       try {
-        // Final image url: new upload > keep existing > null.
         var finalImageUrl = null;
         if (state.reviewFile && state.reviewFile.blob) {
           try {
@@ -2014,7 +1992,6 @@
         clearReviewFile();
 
         await loadAllReviews();
-        // Refresh everything that depends on reviews:
         renderGrid();
         renderModalRatingBadge();
         renderReviewSummary();
@@ -2077,7 +2054,7 @@
   }
 
   /* ==========================================================================
-     16. LIGHTBOX
+     15. LIGHTBOX
      ========================================================================== */
 
   function openReviewLightbox(reviewId) {
@@ -2155,7 +2132,7 @@
   }
 
   /* ==========================================================================
-     17. IMAGE COMPRESSION
+     16. IMAGE COMPRESSION
      ========================================================================== */
 
   function compressImage(file, maxSide, quality) {
@@ -2196,7 +2173,7 @@
   }
 
   /* ==========================================================================
-     18. CATEGORY STRIP + MENU + MISC
+     17. CATEGORY STRIP, MOBILE MENU, MISC
      ========================================================================== */
 
   function setupCategoryStrip() {
@@ -2220,21 +2197,74 @@
     });
   }
 
-  function setupMenu() {
-    var btn = el('hamburgerBtn');
-    var nav = el('headerNav');
-    if (!btn || !nav) return;
+  /* --------------------------------------------------------------------------
+     MOBILE / TABLET HAMBURGER DRAWER
+     - #menuToggle opens #mobileMenu (slide-in from the left, 0.3s).
+     - #menuOverlay, #menuClose, any link with [data-menu-link] or Escape closes.
+     - Body scroll is locked (body.no-scroll) while open.
+     - Auto-closes if the viewport grows to laptop width (>=1024px).
+     -------------------------------------------------------------------------- */
+  function setupMobileMenu() {
+    var toggle = el('menuToggle');
+    var menu = el('mobileMenu');
+    var closeBtn = el('menuClose');
+    var overlay = el('menuOverlay');
+    if (!toggle || !menu || !overlay) return;
 
-    btn.addEventListener('click', function () {
-      var open = nav.classList.toggle('is-open');
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var closeTimer = null;
+
+    function isOpen() {
+      return !menu.hidden && menu.classList.contains('is-open');
+    }
+
+    function openMenu() {
+      if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+      menu.hidden = false;
+      overlay.hidden = false;
+      // Force a reflow so the CSS transform transition runs.
+      void menu.offsetWidth;
+      requestAnimationFrame(function () {
+        menu.classList.add('is-open');
+      });
+      toggle.setAttribute('aria-expanded', 'true');
+      menu.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
+    }
+
+    function closeMenu() {
+      menu.classList.remove('is-open');
+      toggle.setAttribute('aria-expanded', 'false');
+      menu.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
+      // Wait for the 0.3s slide-out, then hide from the DOM.
+      closeTimer = setTimeout(function () {
+        menu.hidden = true;
+        overlay.hidden = true;
+        closeTimer = null;
+      }, 300);
+    }
+
+    toggle.addEventListener('click', function () {
+      if (isOpen()) closeMenu();
+      else openMenu();
     });
 
-    Array.prototype.forEach.call(nav.querySelectorAll('[data-nav-close]'), function (a) {
-      a.addEventListener('click', function () {
-        nav.classList.remove('is-open');
-        btn.setAttribute('aria-expanded', 'false');
-      });
+    if (closeBtn) closeBtn.addEventListener('click', closeMenu);
+    overlay.addEventListener('click', closeMenu);
+
+    // Close when any drawer link is tapped (anchor navigation still runs).
+    Array.prototype.forEach.call(menu.querySelectorAll('[data-menu-link]'), function (a) {
+      a.addEventListener('click', function () { closeMenu(); });
+    });
+
+    // Escape closes the drawer.
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && isOpen()) closeMenu();
+    });
+
+    // Close if the user resizes up to laptop width.
+    window.addEventListener('resize', function () {
+      if (window.innerWidth >= 1024 && !menu.hidden) closeMenu();
     });
   }
 
@@ -2263,24 +2293,25 @@
   }
 
   /* ==========================================================================
-     19. FAQ
+     18. FAQ (Supabase only — no demo fallback)
      ========================================================================== */
 
   async function loadFaqs() {
-    if (!SUPABASE_READY || !sb) {
-      return DEMO_FAQS.slice();
-    }
+    if (!SUPABASE_READY || !sb) return [];
     try {
       var res = await sb
         .from('faqs')
         .select('*')
         .order('sort_order', { ascending: true });
 
-      if (res && res.error) throw res.error;
-      var rows = (res && res.data) || [];
-      return rows.length ? rows : DEMO_FAQS.slice();
+      if (res && res.error) {
+        logError('loadFaqs', res.error);
+        return [];
+      }
+      return (res && res.data) || [];
     } catch (e) {
-      return DEMO_FAQS.slice();
+      logError('loadFaqs', e);
+      return [];
     }
   }
 
@@ -2321,7 +2352,7 @@
   }
 
   /* ==========================================================================
-     20. OFFERS (from site_settings)
+     19. OFFERS (from site_settings)
      ========================================================================== */
 
   function pickOfferFields(settings) {
@@ -2410,8 +2441,21 @@
   }
 
   /* ==========================================================================
-     21. DEEP LINK
+     20. DEEP LINK
+     --------------------------------------------------------------------------
+     #product=VB-005 opens NOTHING when that product does not exist.
      ========================================================================== */
+
+  function findProductByCodeOrId(code) {
+    var byCode = state.products.find(function (p) {
+      return String(p.code || '').toUpperCase() === String(code).toUpperCase();
+    });
+    if (byCode) return byCode;
+
+    var id = codeToId(code);
+    if (!id) return null;
+    return state.products.find(function (p) { return Number(p.id) === id; }) || null;
+  }
 
   function handleDeepLink() {
     if (!window.location.hash) return;
@@ -2419,30 +2463,24 @@
     if (!m) return;
     var code = m[1];
 
-    // Try to match by real code first, then by VB-### -> id.
-    var byCode = state.products.find(function (p) {
-      return String(p.code || '').toUpperCase() === String(code).toUpperCase();
-    });
-    if (byCode) { openProductById(byCode.id); return; }
-
-    var id = codeToId(code);
-    if (!id) return;
-
+    // Check right away, then keep trying briefly while products load.
     var tries = 0;
     var iv = setInterval(function () {
       tries++;
-      var found = state.products.find(function (p) { return Number(p.id) === id; });
+      var found = findProductByCodeOrId(code);
       if (found) {
         clearInterval(iv);
-        openProductById(id);
-      } else if (tries > 30) {
+        openProductById(found.id);
+      } else if (state.loaded || tries > 30) {
+        // Products finished loading (or timed out) and it is still missing:
+        // open nothing, never show a popup for an unknown product.
         clearInterval(iv);
       }
     }, 120);
   }
 
   /* ==========================================================================
-     22. INIT
+     21. INIT
      ========================================================================== */
 
   async function init() {
@@ -2476,14 +2514,14 @@
     }
 
     if (!SUPABASE_READY) {
-      console.warn('[viona] Supabase not ready — using demo products.');
+      console.warn('[viona] Supabase is not ready — products will not load (no demo data).');
     }
 
     // 2. Settings
     state.settings = await loadSettings();
     applySettings();
 
-    // 3. Products + categories
+    // 3. Products + categories (Supabase only)
     await loadProducts();
     buildCategories();
     applyFilters();
@@ -2491,7 +2529,7 @@
     // 4. All reviews (once)
     await loadAllReviews();
 
-    // 5. FAQ
+    // 5. FAQ (Supabase only — no demo fallback)
     var faqs = await loadFaqs();
     renderFaqs(faqs);
 
@@ -2505,7 +2543,7 @@
     setupSearch();
     setupModal();
     setupCategoryStrip();
-    setupMenu();
+    setupMobileMenu();
     setupEmptyReset();
     setupReviewSort();
     setupLightbox();
@@ -2535,15 +2573,9 @@
       }
       var m = window.location.hash.match(/#product=([A-Za-z0-9\-]+)/);
       if (!m) return;
-      var code = m[1];
-
-      var byCode = state.products.find(function (p) {
-        return String(p.code || '').toUpperCase() === String(code).toUpperCase();
-      });
-      if (byCode) { openProductById(byCode.id); return; }
-
-      var id = codeToId(code);
-      if (id) openProductById(id);
+      var found = findProductByCodeOrId(m[1]);
+      if (found) openProductById(found.id);
+      // Missing product -> open nothing.
     });
   }
 
