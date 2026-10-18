@@ -21,9 +21,13 @@
 
 <!--
   Layout note (CSS will handle the breakpoints):
-  PHONE  (<=767px):   login top-right, logo centred below, nav as scrollable row, search below
-  TABLET (768–1023):  logo left, search middle, login + hamburger right
-  LAPTOP (>=1024):    logo left, menu centre, search + login right
+  PHONE + TABLET (<=1023px):
+     Row 1: hamburger LEFT | Viona logo CENTERED | Login/User RIGHT
+     Row 2: full-width search bar
+     Nav row hidden (replaced by the slide-in drawer #mobileMenu)
+  LAPTOP (>=1024px):
+     Logo left | horizontal menu centre | search + login right
+     No hamburger (drawer is unavailable on laptop)
 -->
 </head>
 <body>
@@ -40,13 +44,14 @@
 <header class="site-header" id="siteHeader">
   <div class="header-inner" id="headerInner">
 
-    <!-- Hamburger (visible on tablet; hidden on phone and laptop) -->
-    <button class="hamburger" id="hamburgerBtn" type="button"
-            aria-label="Open menu" aria-expanded="false" aria-controls="headerNav">
+    <!-- Hamburger (visible on phone + tablet; hidden on laptop).
+         Left side of the top row. Opens the slide-in drawer. -->
+    <button class="hamburger" id="menuToggle" type="button"
+            aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
       <span></span><span></span><span></span>
     </button>
 
-    <!-- Brand / logo -->
+    <!-- Brand / logo (centred on phone + tablet) -->
     <a class="brand" href="#top" aria-label="Viona Bangles home">
       <img src="images/logo-gold.png"
            alt="Viona Bangles"
@@ -56,7 +61,7 @@
       <span class="brand-fallback" id="headerLogoFallback" hidden>Viona</span>
     </a>
 
-    <!-- Search bar -->
+    <!-- Search bar (own row on phone + tablet, inline on laptop) -->
     <div class="search-wrap" id="searchWrap">
       <form class="search-form" id="searchForm" role="search" autocomplete="off">
         <span class="search-icon" aria-hidden="true">
@@ -84,10 +89,10 @@
       <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
     </div>
 
-    <!-- Account / Login area -->
+    <!-- Account / Login area (right side of the top row) -->
     <div class="account-wrap" id="accountWrap">
 
-      <!-- Logged-out: small Login button (top-right on phone) -->
+      <!-- Logged-out: small Login button -->
       <button type="button" class="login-btn" id="loginBtn">Login</button>
 
       <!-- Logged-in: avatar + name with a small dropdown -->
@@ -105,13 +110,14 @@
 
     </div>
 
-    <!-- Navigation -->
+    <!-- Navigation (LAPTOP ONLY — hidden up to 1023px via CSS).
+         On phone + tablet the same links live inside #mobileMenu. -->
     <nav class="header-nav" id="headerNav" aria-label="Main navigation">
-      <a href="#top" class="nav-link" data-nav-close>Home</a>
-      <a href="#collections" class="nav-link" data-nav-close>Collections</a>
-      <a href="#about" class="nav-link" data-nav-close>About Us</a>
-      <a href="#contact" class="nav-link" data-nav-close>Contact Us</a>
-      <a href="#faq" class="nav-link" data-nav-close>FAQ</a>
+      <a href="#top" class="nav-link">Home</a>
+      <a href="#collections" class="nav-link">Collections</a>
+      <a href="#about" class="nav-link">About Us</a>
+      <a href="#contact" class="nav-link">Contact Us</a>
+      <a href="#faq" class="nav-link">FAQ</a>
       <a class="nav-wa" id="headerWhatsApp"
          href="https://wa.me/916200920746" target="_blank" rel="noopener"
          aria-label="Chat on WhatsApp">
@@ -129,6 +135,41 @@
          aria-label="Product categories"></div>
   </div>
 </header>
+
+<!-- ==========================================================================
+     MOBILE DRAWER (phone + tablet, screen width up to 1023px)
+     Slide-in from the left. Navy background, gold links.
+     Opened by #menuToggle, closed by overlay / close button / link / Escape.
+     ========================================================================== -->
+<div class="menu-overlay" id="menuOverlay" hidden></div>
+
+<aside class="mobile-menu" id="mobileMenu" hidden aria-label="Main menu" aria-hidden="true">
+  <button type="button" class="mobile-menu-close" id="menuClose" aria-label="Close menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" aria-hidden="true">
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+    </svg>
+  </button>
+
+  <div class="mobile-menu-brand">Viona Bangles</div>
+
+  <nav class="mobile-menu-nav" aria-label="Mobile navigation">
+    <a href="#top"         class="mobile-menu-link" data-menu-link>Home</a>
+    <a href="#collections" class="mobile-menu-link" data-menu-link>Collections</a>
+    <a href="#about"       class="mobile-menu-link" data-menu-link>About Us</a>
+    <a href="#contact"     class="mobile-menu-link" data-menu-link>Contact Us</a>
+    <a href="#faq"         class="mobile-menu-link" data-menu-link>FAQ</a>
+  </nav>
+
+  <a class="mobile-menu-wa" id="mobileMenuWhatsApp"
+     href="https://wa.me/916200920746" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+    </svg>
+    <span>WhatsApp Us</span>
+  </a>
+</aside>
 
 <!-- ==========================================================================
      BANNER CAROUSEL (hidden when no active banner exists)
@@ -205,10 +246,15 @@
         <div class="skeleton-card"></div>
       </div>
 
+      <!-- Empty state — text + reset button are set by JS depending on cause:
+           • No products at all    -> "No products available right now. Please check back soon."
+           • No match (with items) -> "No products found. Try another category or search."
+           • Supabase failed       -> "Could not load products. Please refresh the page."
+           The reset button is hidden when there are no products at all. -->
       <div class="empty-box" id="emptyBox" hidden>
         <div class="empty-mark" aria-hidden="true">✦</div>
-        <p class="empty-title">No bangles found</p>
-        <p class="empty-text">Try a different search word or pick another category.</p>
+        <p class="empty-title" id="emptyTitle">No products found</p>
+        <p class="empty-text" id="emptyText">Try another category or search.</p>
         <button class="btn btn-gold" id="emptyReset" type="button">Show all bangles</button>
       </div>
 
