@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Viona Bangles — Premium Handcrafted Bangles from Gaya, Bihar</title>
 <meta name="description" content="Viona Bangles — premium handcrafted glass and traditional bangles from Gaya, Bihar. Timeless designs, handpicked for every occasion." />
-<meta name="theme-color" content="#14224A" />
+<meta name="theme-color" content="#0B1F3A" />
 
 <!-- Favicon -->
 <link rel="icon" type="image/png" href="images/favicon.png" />
@@ -19,41 +19,34 @@
 <!-- Site styles -->
 <link rel="stylesheet" href="css/style.css" />
 
-<!-- Tiny inline tweak so the injected Account button sits nicely in the
-     header on all screen sizes. Everything else about the account UI is
-     styled by js/auth.js itself. -->
-<style>
-  /* On tablet + desktop, the account button lives inside the header row. */
-  @media (min-width: 768px) {
-    .header-nav #accountMount,
-    .header-inner #accountMount { margin-left: 4px; }
-  }
-</style>
+<!--
+  Layout note (CSS will handle the breakpoints):
+  PHONE  (<=767px):   login top-right, logo centred below, nav as scrollable row, search below
+  TABLET (768–1023):  logo left, search middle, login + hamburger right
+  LAPTOP (>=1024):    logo left, menu centre, search + login right
+-->
 </head>
 <body>
 
 <!-- ==========================================================================
-     OFFER STRIP (thin announcement bar above the header)
-     Filled by js/script.js. Stays hidden and takes ZERO space when no
-     active "strip" message exists in the database.
+     OFFER STRIP (thin announcement bar above the header).
+     Filled by js/script.js. Stays hidden and takes zero space when empty.
      ========================================================================== -->
 <div id="offerStripRoot" class="offer-strip-root" aria-live="polite"></div>
 
 <!-- ==========================================================================
-     SITE HEADER — sticky navy bar
-     PHONE (<=767px):
-        Row 1 = [ hamburger ]  [ logo CENTER ]  [ account/login RIGHT ]
-        Row 2 = full-width search bar
-        Row 3 = category strip (horizontal scroll, no scrollbar)
-     TABLET (768–1023px):
-        logo left | search flexible centre | account + menu right
-     LAPTOP (>=1024px):
-        Same as current desktop layout (logo left | big search centre | nav + account right)
+     SITE HEADER
      ========================================================================== -->
 <header class="site-header" id="siteHeader">
   <div class="header-inner" id="headerInner">
 
-    <!-- Brand / logo (centred on phone via CSS grid) -->
+    <!-- Hamburger (visible on tablet; hidden on phone and laptop) -->
+    <button class="hamburger" id="hamburgerBtn" type="button"
+            aria-label="Open menu" aria-expanded="false" aria-controls="headerNav">
+      <span></span><span></span><span></span>
+    </button>
+
+    <!-- Brand / logo -->
     <a class="brand" href="#top" aria-label="Viona Bangles home">
       <img src="images/logo-gold.png"
            alt="Viona Bangles"
@@ -63,13 +56,7 @@
       <span class="brand-fallback" id="headerLogoFallback" hidden>Viona</span>
     </a>
 
-    <!-- Hamburger — LEFT side on phone, hidden on laptop -->
-    <button class="hamburger" id="hamburgerBtn" type="button"
-            aria-label="Open menu" aria-expanded="false" aria-controls="headerNav">
-      <span></span><span></span><span></span>
-    </button>
-
-    <!-- Big rounded search bar (full width on phone, centre on laptop) -->
+    <!-- Search bar -->
     <div class="search-wrap" id="searchWrap">
       <form class="search-form" id="searchForm" role="search" autocomplete="off">
         <span class="search-icon" aria-hidden="true">
@@ -94,24 +81,39 @@
             <line x1="18" y1="6" x2="6" y2="18"></line></svg>
         </button>
       </form>
-      <!-- Live suggestions dropdown -->
       <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
     </div>
 
-    <!-- Account button — js/auth.js mounts itself here.
-         On phone this sits on the RIGHT of the top row (via CSS grid).
-         On laptop it sits inside the nav row. -->
-    <div id="accountMount"></div>
+    <!-- Account / Login area -->
+    <div class="account-wrap" id="accountWrap">
 
-    <!-- Navigation menu. On phone this slides down below the search bar
-         when the hamburger is tapped. On laptop it is the inline nav row. -->
+      <!-- Logged-out: small Login button (top-right on phone) -->
+      <button type="button" class="login-btn" id="loginBtn">Login</button>
+
+      <!-- Logged-in: avatar + name with a small dropdown -->
+      <div class="user-menu" id="userMenu" hidden>
+        <button type="button" class="user-menu-btn" id="userMenuBtn"
+                aria-haspopup="true" aria-expanded="false">
+          <span class="user-avatar" id="userAvatar">V</span>
+          <span class="user-name" id="userName">User</span>
+        </button>
+        <div class="user-dropdown" id="userDropdown" hidden>
+          <button type="button" class="user-dropdown-item" id="profileBtn">My Profile</button>
+          <button type="button" class="user-dropdown-item" id="logoutBtn">Logout</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Navigation -->
     <nav class="header-nav" id="headerNav" aria-label="Main navigation">
       <a href="#top" class="nav-link" data-nav-close>Home</a>
       <a href="#collections" class="nav-link" data-nav-close>Collections</a>
-      <a href="#about" class="nav-link" data-nav-close>About</a>
-      <a href="#contact" class="nav-link" data-nav-close>Contact</a>
+      <a href="#about" class="nav-link" data-nav-close>About Us</a>
+      <a href="#contact" class="nav-link" data-nav-close>Contact Us</a>
       <a href="#faq" class="nav-link" data-nav-close>FAQ</a>
-      <a class="nav-wa" id="headerWhatsApp" href="#" target="_blank" rel="noopener"
+      <a class="nav-wa" id="headerWhatsApp"
+         href="https://wa.me/916200920746" target="_blank" rel="noopener"
          aria-label="Chat on WhatsApp">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
@@ -121,7 +123,7 @@
 
   </div>
 
-  <!-- Tanishq-style category strip (built automatically by JS) -->
+  <!-- Category strip (built by JS) -->
   <div class="category-strip" id="categoryStrip" hidden>
     <div class="category-strip-inner" id="categoryStripInner" role="tablist"
          aria-label="Product categories"></div>
@@ -129,9 +131,7 @@
 </header>
 
 <!-- ==========================================================================
-     BANNER CAROUSEL
-     Filled by js/script.js. Completely removed from the layout when no active
-     "banner" message exists in the database.
+     BANNER CAROUSEL (hidden when no active banner exists)
      ========================================================================== -->
 <section class="banner-section" id="bannerSection" hidden aria-label="Highlights">
   <div class="container">
@@ -166,7 +166,7 @@
 
       <div class="hero-actions">
         <a href="#collections" class="btn btn-gold">Shop Collections</a>
-        <a href="#" id="heroWhatsApp" class="btn btn-outline"
+        <a href="https://wa.me/916200920746" id="heroWhatsApp" class="btn btn-outline"
            target="_blank" rel="noopener">WhatsApp Us</a>
       </div>
     </div>
@@ -183,7 +183,7 @@
   </section>
 
   <!-- ========================================================================
-       COLLECTIONS
+       COLLECTIONS — category filter is the strip above; search is in header
        ======================================================================== -->
   <section class="collections" id="collections">
     <div class="container">
@@ -194,13 +194,10 @@
         <div class="gold-rule" aria-hidden="true"></div>
       </header>
 
-      <!-- Live count + active filter note -->
       <p class="showing" id="showingCount">Showing 0 bangles</p>
 
-      <!-- Product grid -->
       <div class="product-grid" id="productGrid"></div>
 
-      <!-- Loading skeletons -->
       <div class="product-grid" id="productSkeletons">
         <div class="skeleton-card"></div>
         <div class="skeleton-card"></div>
@@ -208,7 +205,6 @@
         <div class="skeleton-card"></div>
       </div>
 
-      <!-- No results box -->
       <div class="empty-box" id="emptyBox" hidden>
         <div class="empty-mark" aria-hidden="true">✦</div>
         <p class="empty-title">No bangles found</p>
@@ -294,11 +290,11 @@
             </li>
             <li>
               <span class="contact-label">WhatsApp</span>
-              <a id="contactPhone" href="#" target="_blank" rel="noopener">+91 62009 20746</a>
+              <a id="contactPhone" href="https://wa.me/916200920746" target="_blank" rel="noopener">+91 62009 20746</a>
             </li>
           </ul>
           <a class="btn btn-gold btn-block" id="contactWhatsApp"
-             href="#" target="_blank" rel="noopener">Chat on WhatsApp</a>
+             href="https://wa.me/916200920746" target="_blank" rel="noopener">Chat on WhatsApp</a>
         </div>
 
         <div class="contact-panel">
@@ -348,7 +344,7 @@
       <p class="footer-line" id="footerCity">Gaya, Bihar</p>
       <p class="footer-line" id="footerHours">10:00 AM - 7:00 PM</p>
       <a class="footer-link" id="footerEmail" href="mailto:vionabangles@gmail.com">vionabangles@gmail.com</a>
-      <a class="footer-link" id="footerWhatsApp" href="#" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="footer-link" id="footerWhatsApp" href="https://wa.me/916200920746" target="_blank" rel="noopener">WhatsApp</a>
     </div>
 
     <div class="footer-col">
@@ -382,7 +378,7 @@
 
     <div class="modal-body">
 
-      <!-- ---------- LEFT: IMAGE GALLERY ---------- -->
+      <!-- LEFT: gallery -->
       <div class="modal-gallery">
         <div class="gallery-main">
           <img id="galleryMainImg" src="" alt="" />
@@ -392,13 +388,12 @@
         <div class="gallery-thumbs" id="galleryThumbs"></div>
       </div>
 
-      <!-- ---------- RIGHT: INFO + TABS ---------- -->
+      <!-- RIGHT: info + tabs -->
       <div class="modal-info">
 
         <p class="modal-code" id="modalCode"></p>
         <h3 class="modal-title" id="modalTitle"></h3>
 
-        <!-- Average stars, only when at least 1 approved review exists -->
         <button class="modal-rating" id="modalRating" type="button" hidden>
           <span class="stars" id="modalStars" aria-hidden="true"></span>
           <span class="modal-rating-text" id="modalRatingText"></span>
@@ -424,7 +419,6 @@
           </a>
         </div>
 
-        <!-- Tabs -->
         <div class="modal-tabs" role="tablist" aria-label="Product information">
           <button class="tab-btn is-active" id="tabBtnDetails" type="button"
                   role="tab" aria-selected="true" aria-controls="tabDetails"
@@ -434,17 +428,14 @@
                   data-tab="reviews">Reviews <span class="tab-count" id="tabReviewCount"></span></button>
         </div>
 
-        <!-- Tab: details -->
         <div class="tab-panel" id="tabDetails" role="tabpanel"
              aria-labelledby="tabBtnDetails">
           <div class="detail-rows" id="detailRows"></div>
         </div>
 
-        <!-- Tab: reviews -->
         <div class="tab-panel" id="tabReviews" role="tabpanel"
              aria-labelledby="tabBtnReviews" hidden>
 
-          <!-- Signed-in chip -->
           <div class="user-chip" id="userChip" hidden>
             <img class="user-chip-avatar" id="userChipAvatar" src="" alt="" />
             <span class="user-chip-letter" id="userChipLetter" hidden></span>
@@ -452,7 +443,6 @@
             <button class="user-chip-out" id="userChipSignOut" type="button">Sign out</button>
           </div>
 
-          <!-- Summary block -->
           <div class="reviews-summary" id="reviewsSummary">
             <div class="reviews-summary-left">
               <p class="reviews-average" id="reviewsAverage">0.0</p>
@@ -463,7 +453,6 @@
             <div class="reviews-bars" id="reviewsBars"></div>
           </div>
 
-          <!-- Toolbar -->
           <div class="reviews-toolbar" id="reviewsToolbar" hidden>
             <label class="sort-label" for="reviewSort">Sort by</label>
             <select id="reviewSort" class="sort-select">
@@ -473,14 +462,11 @@
             </select>
           </div>
 
-          <!-- Review list -->
           <div class="reviews-list" id="reviewsList"></div>
           <p class="reviews-empty" id="reviewsEmpty" hidden>
             No reviews yet. Be the first to share your thoughts.
           </p>
 
-          <!-- Write / edit review area — filled by js/script.js
-               and wired to VionaAuth (shared login modal). -->
           <div class="review-form-wrap" id="reviewFormWrap"></div>
 
         </div>
@@ -507,6 +493,127 @@
 </div>
 
 <!-- ==========================================================================
+     LOGIN MODAL
+     Contains: login form, signup form, forgot-password form.
+     Required IDs: loginBtn (header), forgotLink, forgotForm, forgotEmail,
+     forgotSendBtn, forgotBackLink, authMessage.
+     ========================================================================== -->
+<div class="auth-modal" id="loginModal" hidden>
+  <div class="auth-backdrop" data-auth-close></div>
+
+  <div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+    <button type="button" class="auth-close" id="loginCloseBtn" aria-label="Close login">×</button>
+
+    <div class="auth-brand">Viona</div>
+    <h2 class="auth-title" id="loginModalTitle">Welcome</h2>
+    <p class="auth-sub" id="loginSub">Login or create an account to continue.</p>
+
+    <!-- Shared message area (used by login, signup and forgot flows) -->
+    <p class="auth-message" id="authMessage" role="alert" hidden></p>
+
+    <!-- Google sign-in -->
+    <button type="button" class="auth-google" id="googleLoginBtn">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.3 26.7 36 24 36c-5.2 0-9.6-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.2C36.9 40.3 44 35 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+      </svg>
+      <span>Continue with Google</span>
+    </button>
+
+    <div class="auth-or"><span>or</span></div>
+
+    <!-- Login form -->
+    <form class="auth-form" id="loginForm" novalidate>
+      <label class="auth-field">
+        <span>Email</span>
+        <input type="email" id="loginEmail" autocomplete="email" required />
+      </label>
+      <label class="auth-field">
+        <span>Password</span>
+        <input type="password" id="loginPassword" autocomplete="current-password" required />
+      </label>
+
+      <!-- Forgot password link — sits right below the password field -->
+      <div class="auth-forgot-row">
+        <button type="button" class="auth-forgot-link" id="forgotLink">Forgot password?</button>
+      </div>
+
+      <button type="submit" class="auth-submit" id="loginSubmitBtn">Login</button>
+
+      <p class="auth-switch">
+        New here?
+        <button type="button" class="auth-switch-link" id="showSignupBtn">Create an account</button>
+      </p>
+    </form>
+
+    <!-- Signup form (hidden by default) -->
+    <form class="auth-form" id="signupForm" hidden novalidate>
+      <label class="auth-field">
+        <span>Full name</span>
+        <input type="text" id="signupName" autocomplete="name" required />
+      </label>
+      <label class="auth-field">
+        <span>Email</span>
+        <input type="email" id="signupEmail" autocomplete="email" required />
+      </label>
+      <label class="auth-field">
+        <span>Password</span>
+        <input type="password" id="signupPassword" autocomplete="new-password" minlength="6" required />
+      </label>
+      <button type="submit" class="auth-submit" id="signupSubmitBtn">Create account</button>
+      <p class="auth-switch">
+        Already have an account?
+        <button type="button" class="auth-switch-link" id="showLoginBtn">Login</button>
+      </p>
+    </form>
+
+    <!-- Forgot password form (hidden by default) -->
+    <form class="auth-form" id="forgotForm" hidden novalidate>
+      <p class="auth-sub">Enter your email and we will send a password reset link.</p>
+      <label class="auth-field">
+        <span>Email</span>
+        <input type="email" id="forgotEmail" autocomplete="email" required />
+      </label>
+      <button type="button" class="auth-submit" id="forgotSendBtn">Send reset link</button>
+      <button type="button" class="auth-back-link" id="forgotBackLink">Back to login</button>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     RESET PASSWORD MODAL — stays hidden by default.
+     Shown after the user clicks the reset link in their email.
+     Required IDs: resetModal, newPassword, confirmPassword, updatePasswordBtn.
+     ========================================================================== -->
+<div class="auth-modal" id="resetModal" hidden>
+  <div class="auth-backdrop" data-auth-close></div>
+
+  <div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
+    <button type="button" class="auth-close" id="resetCloseBtn" aria-label="Close">×</button>
+
+    <div class="auth-brand">Viona</div>
+    <h2 class="auth-title" id="resetModalTitle">Set a new password</h2>
+    <p class="auth-sub">Choose a new password (at least 6 characters).</p>
+
+    <p class="auth-message" id="resetMessage" role="alert" hidden></p>
+
+    <form class="auth-form" id="resetForm" novalidate>
+      <label class="auth-field">
+        <span>New password</span>
+        <input type="password" id="newPassword" autocomplete="new-password" minlength="6" required />
+      </label>
+      <label class="auth-field">
+        <span>Confirm new password</span>
+        <input type="password" id="confirmPassword" autocomplete="new-password" minlength="6" required />
+      </label>
+      <button type="button" class="auth-submit" id="updatePasswordBtn">Update password</button>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
      POPUP MESSAGE ROOT (filled by JS only when an active popup exists)
      ========================================================================== -->
 <div id="popupRoot" class="popup-root"></div>
@@ -518,14 +625,6 @@
 
 <!-- ==========================================================================
      SCRIPTS
-     Order matters:
-       1. supabase-js (CDN)
-       2. config.js   (defines window.VIONA_CONFIG)
-       3. auth.js     (shared login system, mounts Account button, creates
-                       the Supabase client used by script.js via VionaAuth.client.
-                       Also owns the login / signup / forgot-password / set-new-
-                       password modals.)
-       4. script.js   (page logic — calls VionaAuth.init and uses its client)
      ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
