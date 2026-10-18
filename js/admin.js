@@ -14,6 +14,16 @@
      - Photo upload to the "product-images" bucket (main + extras, max 5 each)
      - Offers & Settings tab: reads/writes the site_settings key/value table
      - Friendly toast messages, busy overlay, and error handling everywhere
+
+   Recent additions:
+     - Original price (MRP) column  -> saved in `old_price`
+     - Live "Offer: X% OFF" preview under the price fields
+     - Validation: MRP must be > price when filled
+     - Stock status column         -> saved in `stock_status`
+       (in_stock / low_stock / out_of_stock)
+     - Gold "X% OFF" badge + amber "Low stock" / red "Out of stock"
+       badges on the product list cards
+     - Stock filter in the products toolbar
    ============================================================================ */
 
 (function () {
@@ -29,6 +39,17 @@
   var MAX_MORE_PHOTOS = 5;
   var OFFER_TEXT_MAX = 140;
 
+  // Column names used by the SQL script we ran.
+  var COL_OLD_PRICE = "old_price";       // original / MRP price
+  var COL_STOCK     = "stock_status";    // in_stock | low_stock | out_of_stock
+
+  var STOCK_VALUES = ["in_stock", "low_stock", "out_of_stock"];
+  var STOCK_LABELS = {
+    in_stock:     "In stock",
+    low_stock:    "Low stock (few left)",
+    out_of_stock: "Out of stock"
+  };
+
   /* --------------------------------------------------------------------
      State
      -------------------------------------------------------------------- */
@@ -40,7 +61,8 @@
     products: [],
     productsLoaded: false,
     loadingProducts: false,
-    filters: { search: "", category: "", status: "" },
+    // stock = "", in_stock, low_stock, out_of_stock
+    filters: { search: "", category: "", status: "", stock: "" },
     editingProduct: null,
     mainImage: "",
     additionalImages: [],
@@ -89,6 +111,23 @@
     if (!isFinite(num)) return "Rs 0";
     try { return "Rs " + num.toLocaleString("en-IN"); }
     catch (e) { return "Rs " + num; }
+  }
+
+  // Turn any raw value into one of the three stock constants.
+  function normalizeStock(v) {
+    if (v == null) return "in_stock";
+    var s = String(v).trim().toLowerCase();
+    if (STOCK_VALUES.indexOf(s) !== -1) return s;
+    return "in_stock";
+  }
+
+  // Percentage OFF when MRP > price (rounded). Returns 0 when it isn't valid.
+  function offerPct(price, oldPrice) {
+    var p = Number(price);
+    var o = Number(oldPrice);
+    if (!isFinite(p) || !isFinite(o)) return 0;
+    if (p <= 0 || o <= p) return 0;
+    return Math.round(((o - p) / o) * 100);
   }
 
   /* --------------------------------------------------------------------
@@ -430,6 +469,12 @@
     if (f.category && p.category !== f.category) return false;
     if (f.status === "active" && p.is_active === false) return false;
     if (f.status === "hidden" && p.is_active !== false) return false;
+
+    // Stock filter
+    if (f.stock) {
+      var s = normalizeStock(p[COL_STOCK]);
+      if (s !== f.stock) return false;
+    }
     return true;
   }
 
@@ -464,11 +509,41 @@
 
     body.appendChild(make("p", "list-item-price", formatPrice(p.price)));
 
-    var isActive = p.is_active !== false;
+    // ---- Badges row: active/hidden + offer + stock ----
     var badges = make("p", "list-item-badges");
+
+    var isActive = p.is_active !== false;
     badges.appendChild(make("span",
       isActive ? "badge badge-active" : "badge badge-inactive",
       isActive ? "Active" : "Hidden"));
+
+    // Gold "X% OFF" badge when MRP > price
+    var pct = offerPct(p.price, p[COL_OLD_PRICE]);
+    if (pct > 0) {
+      var off = make("span", "badge",
+        pct + "% OFF");
+      off.style.background = "#FBF3E1";
+      off.style.color = "#8A6A1F";
+      off.style.border = "1px solid #EAD9A8";
+      badges.appendChild(off);
+    }
+
+    // Stock badge (skipped for in_stock — nothing to show)
+    var stock = normalizeStock(p[COL_STOCK]);
+    if (stock === "low_stock") {
+      var low = make("span", "badge", "Low stock");
+      low.style.background = "#FFF4E0";
+      low.style.color = "#8A5A00";
+      low.style.border = "1px solid #F0D9A6";
+      badges.appendChild(low);
+    } else if (stock === "out_of_stock") {
+      var out = make("span", "badge", "Out of stock");
+      out.style.background = "#FDECEA";
+      out.style.color = "#B3261E";
+      out.style.border = "1px solid #F4C7C2";
+      badges.appendChild(out);
+    }
+
     body.appendChild(badges);
 
     card.appendChild(body);
@@ -562,6 +637,7 @@
     var search = $("productSearch");
     var cat = $("productFilterCategory");
     var status = $("productFilterStatus");
+    var stock = $("productFilterStock");
 
     if (search) search.addEventListener("input", function () {
       state.filters.search = search.value.trim();
@@ -573,6 +649,10 @@
     });
     if (status) status.addEventListener("change", function () {
       state.filters.status = status.value;
+      renderProducts();
+    });
+    if (stock) stock.addEventListener("change", function () {
+      state.filters.stock = stock.value;
       renderProducts();
     });
   }
@@ -955,15 +1035,44 @@
     renderMorePhotos();
   }
 
+  /* ---- Live offer preview under price + MRP ------------------------- */
+
+  function updateOfferPreview() {
+    var el = $("pOfferPreview");
+    if (!el) return;
+
+    var priceEl = $("pPrice");
+    var mrpEl   = $("pMrp");
+    var price = priceEl ? Number(priceEl.value) : 0;
+    var mrp   = mrpEl ? Number(mrpEl.value) : 0;
+
+    var pct = offerPct(price, mrp);
+    if (pct > 0) {
+      el.textContent = "Offer: " + pct + "% OFF";
+      showEl(el);
+    } else {
+      el.textContent = "";
+      hideEl(el);
+    }
+  }
+
+  function wireOfferPreview() {
+    var pEl = $("pPrice");
+    var mEl = $("pMrp");
+    if (pEl) pEl.addEventListener("input", updateOfferPreview);
+    if (mEl) mEl.addEventListener("input", updateOfferPreview);
+  }
+
   function resetProductForm() {
-    ["pName", "pCode", "pPrice", "pDescription", "pWhatsapp", "pExtraSizes", "pMeeshoLink"]
-      .forEach(function (id) {
-        var el = $(id);
-        if (el) el.value = "";
-      });
+    ["pName", "pCode", "pPrice", "pMrp", "pDescription", "pWhatsapp",
+     "pExtraSizes", "pMeeshoLink"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.value = "";
+    });
 
     var cat = $("pCategory"); if (cat) cat.value = "";
     var act = $("pIsActive"); if (act) act.checked = true;
+    var stk = $("pStockStatus"); if (stk) stk.value = "in_stock";
 
     $$("#pSizeChecks input[type=checkbox]").forEach(function (cb) {
       cb.checked = false;
@@ -979,6 +1088,7 @@
     setUploadStatus("");
     state.uploadingCount = 0;
     setSaveDisabled(false);
+    updateOfferPreview();
   }
 
   function sizesFromForm() {
@@ -1046,6 +1156,18 @@
       var catEl = $("pCategory"); if (catEl) catEl.value = p.category || "";
       var priceEl = $("pPrice");
       if (priceEl) priceEl.value = (p.price == null ? "" : String(p.price));
+
+      // MRP -> old_price
+      var mrpEl = $("pMrp");
+      if (mrpEl) {
+        var mrpVal = p[COL_OLD_PRICE];
+        mrpEl.value = (mrpVal == null || mrpVal === "") ? "" : String(mrpVal);
+      }
+
+      // Stock status
+      var stockEl = $("pStockStatus");
+      if (stockEl) stockEl.value = normalizeStock(p[COL_STOCK]);
+
       var descEl = $("pDescription");
       if (descEl) descEl.value = p.description || "";
       var waEl = $("pWhatsapp"); if (waEl) waEl.value = p.whatsapp || "";
@@ -1062,6 +1184,7 @@
       if (editId) editId.value = "";
     }
 
+    updateOfferPreview();
     openModal("productModal");
     setTimeout(function () {
       var n = $("pName");
@@ -1285,10 +1408,14 @@
     var nameEl = $("pName");
     var catEl = $("pCategory");
     var priceEl = $("pPrice");
+    var mrpEl = $("pMrp");
+    var stockEl = $("pStockStatus");
 
     var name = nameEl ? String(nameEl.value || "").trim() : "";
     var category = catEl ? catEl.value : "";
     var priceRaw = priceEl ? String(priceEl.value || "").trim() : "";
+    var mrpRaw = mrpEl ? String(mrpEl.value || "").trim() : "";
+    var stockVal = stockEl ? normalizeStock(stockEl.value) : "in_stock";
 
     if (!name) { showProductError("Please enter a product name."); return; }
     if (!category) { showProductError("Please choose a category."); return; }
@@ -1301,6 +1428,23 @@
       showProductError("Price must be a positive number.");
       return;
     }
+
+    // MRP is optional. When filled it must be > price.
+    var oldPrice = null;
+    if (mrpRaw !== "") {
+      if (isNaN(Number(mrpRaw))) {
+        showProductError("Original price (MRP) must be a valid number.");
+        return;
+      }
+      var mrpNum = Number(mrpRaw);
+      if (mrpNum <= price) {
+        showProductError("Original price must be higher than the selling price.");
+        return;
+      }
+      oldPrice = mrpNum;
+    }
+
+    if (STOCK_VALUES.indexOf(stockVal) === -1) stockVal = "in_stock";
 
     var codeEl = $("pCode");
     var code = codeEl ? String(codeEl.value || "").trim() : "";
@@ -1326,6 +1470,10 @@
       whatsapp: waEl ? (String(waEl.value || "").trim() || null) : null,
       is_active: !!(actEl && actEl.checked)
     };
+
+    // New columns — sent by name so safeWrite() will drop them if missing.
+    payload[COL_OLD_PRICE] = oldPrice;   // null or number
+    payload[COL_STOCK]     = stockVal;   // one of the three constants
 
     busy(true);
 
@@ -1534,6 +1682,7 @@
     wireProductList();
     wireProductFilters();
     wirePhotoUploads();
+    wireOfferPreview();
 
     var yes = $("confirmYes");
     if (yes) yes.addEventListener("click", function () { closeConfirm(true); });
