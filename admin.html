@@ -160,6 +160,14 @@
           <option value="active">Active only</option>
           <option value="hidden">Hidden only</option>
         </select>
+
+        <!-- NEW: filter by stock status -->
+        <select id="productFilterStock" class="input" aria-label="Filter by stock status">
+          <option value="">All stock</option>
+          <option value="in_stock">In stock</option>
+          <option value="low_stock">Low stock</option>
+          <option value="out_of_stock">Out of stock</option>
+        </select>
       </div>
 
       <div class="list-block" id="productsList">
@@ -313,11 +321,34 @@
           </select>
         </label>
 
-        <label class="field">
-          <span>Price (Rs) *</span>
-          <input type="number" id="pPrice" class="input" min="0" step="1" inputmode="decimal" />
-        </label>
+        <!-- Price + MRP side by side (nested 2-col grid) -->
+        <div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:0;">
+          <label class="field" style="margin-bottom:0;">
+            <span>Price (Rs) *</span>
+            <input type="number" id="pPrice" class="input" min="0" step="1" inputmode="decimal" />
+          </label>
+          <label class="field" style="margin-bottom:0;">
+            <span>Original price (MRP) — optional</span>
+            <input type="number" id="pMrp" class="input" min="0" step="1" inputmode="decimal" />
+            <small class="hint">Fill this only if you want to show an offer. Must be higher than the selling price.</small>
+          </label>
+        </div>
       </div>
+
+      <!-- Live offer preview (fills in when MRP > price) -->
+      <p class="hint" id="pOfferPreview"
+         style="margin:-2px 0 12px;font-weight:600;color:#C9A24B;letter-spacing:.02em;"
+         hidden></p>
+
+      <!-- Stock status -->
+      <label class="field">
+        <span>Stock status</span>
+        <select id="pStockStatus" class="input">
+          <option value="in_stock" selected>In stock</option>
+          <option value="low_stock">Low stock (few left)</option>
+          <option value="out_of_stock">Out of stock</option>
+        </select>
+      </label>
 
       <!-- ---------- Sizes ---------- -->
       <div class="field">
@@ -443,8 +474,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
-<script src="js/admin.js"></script>  
-<script src="js/customers.js"></script> 
+<script src="js/admin.js"></script>
+<script src="js/customers.js"></script>
 
 </body>
 </html>
