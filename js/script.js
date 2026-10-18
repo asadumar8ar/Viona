@@ -1,5 +1,5 @@
 /* ============================================================================
-   Viona Bangles — js/script.js  (Part 3 of 3)
+   Viona Bangles — js/script.js
    ----------------------------------------------------------------------------
    Public homepage logic. Plain vanilla JS, no build step.
 
@@ -12,21 +12,30 @@
      - Loads products + site_settings from Supabase (defensive: learns columns
        by doing select * limit 1).
      - Products come ONLY from the Supabase `products` table, showing only rows
-       where is_active is not false. There is NO demo/sample data anywhere:
-       empty results, failures and missing rows never show fake products or
-       fake reviews.
+       where is_active is not false. There is NO demo/sample data anywhere.
      - Header search + suggestions, category strip, product grid.
      - Product modal with gallery, size chips, WhatsApp order button.
      - Offers banner from site_settings (hidden when empty).
-     - Reviews: fetches ALL reviews once, groups by product_id (String compare)
-       and computes count/total/average per product.
+     - Reviews: fetched once, grouped by product_id.
      - Review form wired to VionaAuth (login required).
      - Mobile slide-in drawer (#mobileMenu) with overlay / close / Escape.
-     - Injects its own CSS so css/style.css does not need to change for stars
-       and review UI.
-     - Shows the REAL Supabase error message on any failure.
+     - Injects its own CSS so css/style.css does not need to change.
 
-   Deep link: #product=VB-001 — opens NOTHING when the product does not exist.
+   Recent additions:
+     - Original price (MRP) is read from `old_price`. When MRP > price the
+       card / modal show the strike-through MRP plus a gold "X% OFF" badge.
+       Otherwise only the price is shown. Fake / invalid values never show OFF.
+     - `stock_status` column is read. Values:
+         • in_stock      -> nothing extra
+         • low_stock     -> amber "Only few left" label on card + modal
+         • out_of_stock  -> dim image + red ribbon on card;
+                            grey "Currently out of stock" button in modal,
+                            size chips disabled, plus an "Ask when it will
+                            be back" link that opens WhatsApp with the
+                            product code.
+       Out-of-stock products still appear in the grid (unless is_active is
+       false), so category counts / search / filters keep working.
+     - Deep link #product=VB-001 opens NOTHING when the product does not exist.
    ============================================================================ */
 
 (function () {
@@ -85,14 +94,23 @@
     return 'Rs ' + s;
   }
 
+  // Only returns a percentage when both numbers are valid AND MRP > price.
   function discountPct(price, oldPrice) {
     var p = Number(price), o = Number(oldPrice);
     if (!o || !p || o <= p) return 0;
-    return Math.round(((o - p) / o) * 100);
+    var pct = Math.round(((o - p) / o) * 100);
+    return pct > 0 ? pct : 0;
+  }
+
+  // Turn any raw value into one of the three stock constants.
+  function normalizeStock(v) {
+    if (v == null) return 'in_stock';
+    var s = String(v).trim().toLowerCase();
+    if (s === 'low_stock' || s === 'out_of_stock' || s === 'in_stock') return s;
+    return 'in_stock';
   }
 
   function productCode(id, code) {
-    // Prefer a real code from the row. Otherwise build VB-001 from the id.
     if (code && typeof code === 'string' && code.trim()) return code.trim();
     var n = Number(id) || 0;
     var s = String(n);
@@ -167,18 +185,16 @@
     activeCategory: 'All',
     searchTerm: '',
 
-    productCols: null,      // array of column names (null when table is empty)
-    R: null,                // resolved column map
+    productCols: null,
+    R: null,
 
-    // Load flags — used to decide the empty-state message.
-    loaded: false,          // true once the products request finished (ok or failed)
-    loadError: false,       // true when the products request failed
+    loaded: false,
+    loadError: false,
 
-    settings: {},           // merged settings object (business, hero, about, ...)
+    settings: {},
 
-    // Reviews — all fetched once, grouped by String(product_id)
     allReviews: [],
-    reviewsByProduct: {},   // { '1': [ {…}, {…} ] }
+    reviewsByProduct: {},
 
     currentProduct: null,
     currentSize: null,
@@ -190,19 +206,15 @@
     currentProfile: null,
     editingReview: false,
 
-    // Review form (transient)
     pickerRating: 0,
     reviewFile: null,
     reviewPreviewUrl: '',
 
-    // Lightbox
     lightbox: { images: [], index: 0 },
 
-    // Search UI
     suggestIndex: -1,
     suggestItems: [],
 
-    // Offers
     offerText: '',
     offerLink: '',
     offerActive: false
@@ -332,6 +344,45 @@
       '.vrt-btn-ghost{background:#fff;border-color:#E4DED2;color:#0B1F3A;}',
       '.vrt-btn-ghost:hover:not(:disabled){border-color:#C9A24B;}',
 
+      /* ---------- STOCK: card visuals ---------- */
+      '.card-media.is-out{background:#F1EDE4;}',
+      '.card-media.is-out .card-img{opacity:.4;filter:grayscale(.4);}',
+      '.card-media.is-out .card-placeholder{opacity:.5;}',
+      /* red diagonal ribbon across the card image */
+      '.card-ribbon{position:absolute;top:50%;left:50%;',
+      'transform:translate(-50%,-50%) rotate(-12deg);',
+      'z-index:3;pointer-events:none;',
+      'padding:7px 18px;border-radius:4px;',
+      'font-family:var(--font-body,inherit);font-size:11px;font-weight:800;',
+      'letter-spacing:.14em;text-transform:uppercase;',
+      'color:#fff;background:#C0392B;border:2px solid #fff;',
+      'box-shadow:0 6px 16px rgba(0,0,0,.28);}',
+      /* small amber "Only few left" chip under the card price */
+      '.card-lowstock{display:inline-block;margin:6px 0 0;',
+      'font-size:11px;font-weight:700;letter-spacing:.04em;',
+      'color:#8A5A00;background:#FFF4E0;',
+      'border:1px solid #F0D9A6;border-radius:999px;padding:3px 10px;}',
+
+      /* ---------- STOCK: modal visuals ---------- */
+      '.modal-lowstock{margin:0 0 10px;padding:8px 12px;border-radius:8px;',
+      'font-size:13px;font-weight:600;text-align:center;',
+      'color:#8A5A00;background:#FFF4E0;border:1px solid #F0D9A6;}',
+      /* grey disabled "Currently out of stock" button (replaces the green WA) */
+      '.modal-outstock{display:block;width:100%;margin:0 0 10px;',
+      'padding:13px 20px;border:0;border-radius:999px;',
+      'background:#B7B7B7;color:#fff;',
+      'font-family:inherit;font-size:13px;font-weight:600;',
+      'letter-spacing:.09em;text-transform:uppercase;',
+      'text-align:center;cursor:not-allowed;box-shadow:none;}',
+      /* "Ask when it will be back" link */
+      '.modal-restock-link{display:block;margin:10px 0 0;text-align:center;',
+      'font-size:13px;font-weight:600;color:#0B1F3A;',
+      'text-decoration:underline;text-underline-offset:3px;}',
+      '.modal-restock-link:hover{color:#C9A24B;}',
+      /* disabled size chips */
+      '.size-chip.is-disabled,.size-chip[disabled]{opacity:.45;',
+      'cursor:not-allowed;pointer-events:none;}',
+
       /* ---------- mobile ---------- */
       '@media (max-width:600px){',
       '.vrt-summary{grid-template-columns:1fr;gap:16px;text-align:center;}',
@@ -394,7 +445,6 @@
       var rows = (res && res.data) || [];
 
       if (rows.length && Object.prototype.hasOwnProperty.call(rows[0], 'key')) {
-        // key/value style
         rows.forEach(function (row) {
           if (!row || row.key == null) return;
           var key = String(row.key);
@@ -407,7 +457,6 @@
             merged[key] = val;
           }
 
-          // Flat keys used by the offer banner.
           if (key === 'whatsapp_number' && val) merged.business.whatsapp = String(val);
           if (key === 'phone' && val) merged.business.phone = String(val);
           if (key === 'contact_email' && val) merged.business.email = String(val);
@@ -416,7 +465,6 @@
           if (key === 'facebook_url' && val) merged.social.facebook = String(val);
         });
 
-        // Offer banner fields kept on the top level too.
         var offerRow = rows.find(function (r) { return r && r.key === 'offer_text'; });
         if (offerRow) merged.offer_text = String(offerRow.value || '');
         var activeRow = rows.find(function (r) { return r && r.key === 'offer_active'; });
@@ -425,7 +473,6 @@
                                  String(activeRow.value).toLowerCase() === 'true');
         }
       } else {
-        // column style — merge the first row directly
         var first = rows[0] || {};
         Object.keys(first).forEach(function (k) {
           if (merged[k] && typeof merged[k] === 'object' && !Array.isArray(merged[k]) &&
@@ -555,7 +602,6 @@
     state.productCols = row ? Object.keys(row) : null;
 
     if (!state.productCols) {
-      // Table is empty — remember a generic map so normalizeProduct still works.
       state.R = {
         known: false,
         id: 'id',
@@ -570,6 +616,7 @@
         code: 'code',
         featured: 'featured',
         is_active: 'is_active',
+        stock_status: 'stock_status',
         created_at: 'created_at'
       };
       return state.R;
@@ -598,6 +645,7 @@
       code: pick('code', 'product_code', 'sku'),
       featured: pick('featured', 'is_featured'),
       is_active: pick('is_active', 'active', 'visible'),
+      stock_status: pick('stock_status', 'stock'),
       created_at: pick('created_at')
     };
 
@@ -611,7 +659,6 @@
     state.loaded = false;
     state.loadError = false;
 
-    // No Supabase client -> this IS a load failure. Never show demo data.
     if (!SUPABASE_READY || !sb) {
       logError('loadProducts', 'Supabase is not ready.');
       state.loadError = true;
@@ -625,7 +672,6 @@
 
       var q = sb.from('products').select('*');
 
-      // Order by created_at desc when we know it, else by id desc.
       if (R.known && R.created_at) {
         q = q.order(R.created_at, { ascending: false });
       } else if (R.known) {
@@ -642,7 +688,6 @@
       var rows = (res && res.data) || [];
 
       // Keep only rows where is_active is NOT false.
-      // (Missing / null values are treated as visible.)
       var visibleRows = rows.filter(function (row) {
         if (!row) return false;
         var v = row.is_active;
@@ -675,7 +720,9 @@
     var oldPrice = null;
     var oldRaw = (R.old_price && row[R.old_price] != null) ? row[R.old_price] : row.old_price;
     if (oldRaw != null && oldRaw !== '') oldPrice = Number(oldRaw);
-    if (isNaN(oldPrice)) oldPrice = null;
+    if (isNaN(oldPrice) || oldPrice <= 0) oldPrice = null;
+    // Never show OFF for fake values — if MRP <= price, drop it.
+    if (oldPrice != null && !(oldPrice > price)) oldPrice = null;
 
     var sizesRaw = (R.sizes && row[R.sizes] != null) ? row[R.sizes] : row.sizes;
     var sizes;
@@ -705,6 +752,8 @@
 
     var code = (R.code && row[R.code] != null) ? String(row[R.code]) : (row.code ? String(row.code) : '');
 
+    var stockRaw = (R.stock_status && row[R.stock_status] != null) ? row[R.stock_status] : row.stock_status;
+
     return {
       id: id,
       name: name,
@@ -718,6 +767,7 @@
       code: code,
       is_active: true,
       featured: !!(R.featured ? row[R.featured] : row.featured),
+      stock_status: normalizeStock(stockRaw),
       created_at: row.created_at || null
     };
   }
@@ -901,7 +951,6 @@
     var list = state.filtered;
     var hasProducts = state.products.length > 0;
 
-    // "Showing N bangles" line — hidden when there are no products at all.
     if (showing) {
       if (!hasProducts) {
         showing.hidden = true;
@@ -918,13 +967,10 @@
       if (emptyBox) {
         emptyBox.hidden = false;
         if (state.loadError) {
-          // Supabase failed — never show demo data.
           setEmptyState('Could not load products.', 'Please refresh the page.', false);
         } else if (!hasProducts) {
-          // Loaded fine, but there are simply no products.
           setEmptyState('No products available right now.', 'Please check back soon.', false);
         } else {
-          // Products exist, but this filter/search has no match.
           setEmptyState('No products found.', 'Try another category or search.', true);
         }
       }
@@ -939,23 +985,39 @@
       var off = discountPct(p.price, p.old_price);
       var code = productCode(p.id, p.code);
       var stats = reviewStatsFor(p.id);
+      var stock = normalizeStock(p.stock_status);
+      var isOut = stock === 'out_of_stock';
 
+      // media: dim the image when out of stock
       var mediaHtml = '';
       if (imgs.length) {
-        mediaHtml = '<img class="card-img" src="' + escAttr(imgs[0]) + '" alt="' + escAttr(p.name) + '" loading="lazy" ' +
-                    'onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.card-placeholder\').hidden=false;" />' +
-                    '<div class="card-placeholder" hidden><span>Viona</span></div>';
+        mediaHtml =
+          '<img class="card-img" src="' + escAttr(imgs[0]) + '" alt="' + escAttr(p.name) + '" loading="lazy" ' +
+          'onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.card-placeholder\').hidden=false;" />' +
+          '<div class="card-placeholder" hidden><span>Viona</span></div>';
       } else {
         mediaHtml = '<div class="card-placeholder"><span>Viona</span></div>';
       }
 
+      // red ribbon for out of stock
+      var ribbonHtml = isOut
+        ? '<span class="card-ribbon" aria-hidden="true">Out of stock</span>'
+        : '';
+
+      // gold "X% OFF" (only when a real, higher MRP exists)
       var badgeHtml = off > 0 ? '<span class="card-badge">' + off + '% OFF</span>' : '';
       var featHtml  = p.featured ? '<span class="card-featured">Featured</span>' : '';
 
+      // price: show MRP strike-through only when the offer is real
       var priceHtml = '<span class="price-now">' + esc(money(p.price)) + '</span>';
       if (off > 0) {
         priceHtml += '<span class="price-old">' + esc(money(p.old_price)) + '</span>';
       }
+
+      // amber "Only few left" under the price
+      var lowStockHtml = stock === 'low_stock'
+        ? '<p class="card-lowstock">Only few left</p>'
+        : '';
 
       var ratingHtml = '';
       if (stats.total > 0) {
@@ -971,14 +1033,15 @@
 
       html +=
         '<article class="product-card" data-id="' + escAttr(String(p.id)) + '">' +
-          '<div class="card-media">' +
-            badgeHtml + featHtml + mediaHtml +
+          '<div class="card-media' + (isOut ? ' is-out' : '') + '">' +
+            badgeHtml + featHtml + mediaHtml + ribbonHtml +
           '</div>' +
           '<div class="card-body">' +
             '<p class="card-cat">' + esc(p.category) + '</p>' +
             '<h3 class="card-name">' + esc(p.name) + '</h3>' +
             ratingHtml +
             '<div class="card-price">' + priceHtml + '</div>' +
+            lowStockHtml +
             '<button type="button" class="card-open" data-open="' + escAttr(String(p.id)) + '">View Details</button>' +
           '</div>' +
         '</article>';
@@ -1182,7 +1245,6 @@
   var lastFocusedBeforeModal = null;
 
   function openProductById(id) {
-    // Never open anything if the product is not in the real product list.
     var product = state.products.find(function (p) { return Number(p.id) === Number(id); });
     if (!product) return;
     openProduct(product);
@@ -1355,16 +1417,23 @@
       return;
     }
     section.hidden = false;
+    section.classList.remove('is-disabled');
+
+    var stock = normalizeStock(p.stock_status);
+    var disabled = (stock === 'out_of_stock');
+    if (disabled) section.classList.add('is-disabled');
 
     var html = '';
     sizes.forEach(function (s) {
-      html += '<button type="button" class="size-chip" role="radio" aria-checked="false" data-size="' +
-              escAttr(s) + '">' + esc(s) + '</button>';
+      html += '<button type="button" class="size-chip' + (disabled ? ' is-disabled' : '') +
+              '" role="radio" aria-checked="false"' + (disabled ? ' disabled' : '') +
+              ' data-size="' + escAttr(s) + '">' + esc(s) + '</button>';
     });
     wrap.innerHTML = html;
 
     Array.prototype.forEach.call(wrap.querySelectorAll('.size-chip'), function (btn) {
       btn.addEventListener('click', function () {
+        if (disabled) return;
         Array.prototype.forEach.call(wrap.querySelectorAll('.size-chip'), function (b) {
           b.classList.remove('is-active');
           b.setAttribute('aria-checked', 'false');
@@ -1376,28 +1445,69 @@
       });
     });
 
-    var first = wrap.querySelector('.size-chip');
-    if (first) {
-      first.classList.add('is-active');
-      first.setAttribute('aria-checked', 'true');
-      state.currentSize = first.getAttribute('data-size');
+    if (!disabled) {
+      var first = wrap.querySelector('.size-chip');
+      if (first) {
+        first.classList.add('is-active');
+        first.setAttribute('aria-checked', 'true');
+        state.currentSize = first.getAttribute('data-size');
+      }
+    } else {
+      state.currentSize = null;
     }
   }
 
+  /* --------------------------------------------------------------------------
+     Build the modal-actions block based on stock status.
+     Elements #modalLowStock / #modalOutStock / #modalAskRestock are injected
+     once in setupModalExtras() and then toggled here.
+     -------------------------------------------------------------------------- */
   function updateModalWhatsApp() {
     var link = el('modalWhatsApp');
-    var p = state.currentProduct;
+    var low  = el('modalLowStock');
+    var out  = el('modalOutStock');
+    var ask  = el('modalAskRestock');
+    var p    = state.currentProduct;
     if (!link || !p) return;
 
     var num = (state.settings.business && state.settings.business.whatsapp) || CFG.WHATSAPP_NUMBER || '';
     var code = productCode(p.id, p.code);
     var sizePart = state.currentSize ? ('\nSize: ' + state.currentSize) : '';
-    var msg = 'Hello Viona Bangles,\n' +
-              'I would like to order:\n' +
-              '• ' + p.name + ' (' + code + ')\n' +
-              '• Price: ' + money(p.price) + sizePart + '\n\n' +
-              'Please share delivery details.';
-    link.href = waLink(num, msg);
+    var orderMsg = 'Hello Viona Bangles,\n' +
+                   'I would like to order:\n' +
+                   '• ' + p.name + ' (' + code + ')\n' +
+                   '• Price: ' + money(p.price) + sizePart + '\n\n' +
+                   'Please share delivery details.';
+    var askMsg = 'Hello Viona Bangles,\n' +
+                 'I would like to know when "' + p.name + '" (' + code + ') ' +
+                 'will be back in stock.\n\nThank you.';
+
+    var stock = normalizeStock(p.stock_status);
+
+    if (stock === 'out_of_stock') {
+      // Replace the green order button with the grey disabled one.
+      link.hidden = true;
+      if (low) low.hidden = true;
+      if (out) out.hidden = false;
+      if (ask) {
+        ask.hidden = false;
+        ask.href = waLink(num, askMsg);
+      }
+    } else {
+      // in_stock OR low_stock: order button stays.
+      link.hidden = false;
+      link.href = waLink(num, orderMsg);
+      link.classList.remove('is-disabled');
+      link.removeAttribute('aria-disabled');
+      link.style.background = '';
+      link.style.boxShadow = '';
+      link.style.cursor = '';
+      link.style.pointerEvents = '';
+
+      if (out) out.hidden = true;
+      if (ask) ask.hidden = true;
+      if (low) low.hidden = (stock !== 'low_stock');
+    }
   }
 
   function renderDetailRows(p) {
@@ -1442,9 +1552,51 @@
     }
   }
 
+  /* --------------------------------------------------------------------------
+     Add the extra modal-actions siblings once, right after #modalWhatsApp.
+     We can't modify index.html so we do it here on init.
+     -------------------------------------------------------------------------- */
+  function setupModalExtras() {
+    var link = el('modalWhatsApp');
+    if (!link) return;
+    if (el('modalLowStock')) return; // already set up
+
+    var wrap = link.parentElement;
+    if (!wrap) return;
+
+    var low = document.createElement('p');
+    low.className = 'modal-lowstock';
+    low.id = 'modalLowStock';
+    low.hidden = true;
+    low.textContent = 'Only few left — order soon';
+
+    var out = document.createElement('button');
+    out.type = 'button';
+    out.className = 'modal-outstock';
+    out.id = 'modalOutStock';
+    out.disabled = true;
+    out.hidden = true;
+    out.textContent = 'Currently out of stock';
+
+    var ask = document.createElement('a');
+    ask.className = 'modal-restock-link';
+    ask.id = 'modalAskRestock';
+    ask.hidden = true;
+    ask.target = '_blank';
+    ask.rel = 'noopener';
+    ask.textContent = 'Ask when it will be back';
+
+    // Order: low label · green button (already there) · grey button · ask link
+    wrap.insertBefore(low, link);
+    wrap.appendChild(out);
+    wrap.appendChild(ask);
+  }
+
   function setupModal() {
     var modal = el('productModal');
     if (!modal) return;
+
+    setupModalExtras();
 
     var closeBtn = el('modalClose');
     if (closeBtn) closeBtn.addEventListener('click', closeProductModal);
@@ -1705,7 +1857,6 @@
     var wrap = el('reviewFormWrap');
     if (!wrap || !state.currentProduct) return;
 
-    // ---- Not signed in -> CTA ----
     if (!state.currentUser) {
       wrap.innerHTML =
         '<div class="vrt-cta">' +
@@ -1724,8 +1875,6 @@
     }
 
     var existing = currentUserReviewFor(state.currentProduct.id);
-
-    // ---- Already reviewed, not editing -> nothing extra ----
     if (existing && !state.editingReview) {
       wrap.innerHTML = '';
       return;
@@ -2197,13 +2346,6 @@
     });
   }
 
-  /* --------------------------------------------------------------------------
-     MOBILE / TABLET HAMBURGER DRAWER
-     - #menuToggle opens #mobileMenu (slide-in from the left, 0.3s).
-     - #menuOverlay, #menuClose, any link with [data-menu-link] or Escape closes.
-     - Body scroll is locked (body.no-scroll) while open.
-     - Auto-closes if the viewport grows to laptop width (>=1024px).
-     -------------------------------------------------------------------------- */
   function setupMobileMenu() {
     var toggle = el('menuToggle');
     var menu = el('mobileMenu');
@@ -2221,7 +2363,6 @@
       if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
       menu.hidden = false;
       overlay.hidden = false;
-      // Force a reflow so the CSS transform transition runs.
       void menu.offsetWidth;
       requestAnimationFrame(function () {
         menu.classList.add('is-open');
@@ -2236,7 +2377,6 @@
       toggle.setAttribute('aria-expanded', 'false');
       menu.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('no-scroll');
-      // Wait for the 0.3s slide-out, then hide from the DOM.
       closeTimer = setTimeout(function () {
         menu.hidden = true;
         overlay.hidden = true;
@@ -2252,17 +2392,14 @@
     if (closeBtn) closeBtn.addEventListener('click', closeMenu);
     overlay.addEventListener('click', closeMenu);
 
-    // Close when any drawer link is tapped (anchor navigation still runs).
     Array.prototype.forEach.call(menu.querySelectorAll('[data-menu-link]'), function (a) {
       a.addEventListener('click', function () { closeMenu(); });
     });
 
-    // Escape closes the drawer.
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && isOpen()) closeMenu();
     });
 
-    // Close if the user resizes up to laptop width.
     window.addEventListener('resize', function () {
       if (window.innerWidth >= 1024 && !menu.hidden) closeMenu();
     });
@@ -2368,7 +2505,6 @@
       active = true;
     }
 
-    // Also accept nested { offer: { text, link, active } }
     if (!text && settings.offer && typeof settings.offer === 'object') {
       if (settings.offer.text) text = String(settings.offer.text);
       if (settings.offer.link) link = String(settings.offer.link);
@@ -2388,7 +2524,6 @@
   function renderOfferBanner() {
     var offer = pickOfferFields(state.settings);
 
-    // No text, or explicitly turned off -> hide everything.
     if (!offer.text || !offer.active) {
       var stripRoot = el('offerStripRoot');
       if (stripRoot) { stripRoot.innerHTML = ''; stripRoot.hidden = true; }
@@ -2397,7 +2532,6 @@
       return;
     }
 
-    // ---- Strip version ----
     var stripRoot2 = el('offerStripRoot');
     if (stripRoot2) {
       var linkHtml = offer.link
@@ -2420,7 +2554,6 @@
       }
     }
 
-    // ---- Banner version ----
     var bannerSec = el('bannerSection');
     var bannerTrack = el('bannerTrack');
     var bannerDots = el('bannerDots');
@@ -2442,7 +2575,6 @@
 
   /* ==========================================================================
      20. DEEP LINK
-     --------------------------------------------------------------------------
      #product=VB-005 opens NOTHING when that product does not exist.
      ========================================================================== */
 
@@ -2463,7 +2595,6 @@
     if (!m) return;
     var code = m[1];
 
-    // Check right away, then keep trying briefly while products load.
     var tries = 0;
     var iv = setInterval(function () {
       tries++;
@@ -2472,8 +2603,6 @@
         clearInterval(iv);
         openProductById(found.id);
       } else if (state.loaded || tries > 30) {
-        // Products finished loading (or timed out) and it is still missing:
-        // open nothing, never show a popup for an unknown product.
         clearInterval(iv);
       }
     }, 120);
@@ -2486,7 +2615,6 @@
   async function init() {
     injectStyles();
 
-    // 1. Auth (VionaAuth owns the Supabase client).
     if (window.VionaAuth && typeof window.VionaAuth.init === 'function') {
       try {
         var maybe = window.VionaAuth.init();
@@ -2517,29 +2645,22 @@
       console.warn('[viona] Supabase is not ready — products will not load (no demo data).');
     }
 
-    // 2. Settings
     state.settings = await loadSettings();
     applySettings();
 
-    // 3. Products + categories (Supabase only)
     await loadProducts();
     buildCategories();
     applyFilters();
 
-    // 4. All reviews (once)
     await loadAllReviews();
 
-    // 5. FAQ (Supabase only — no demo fallback)
     var faqs = await loadFaqs();
     renderFaqs(faqs);
 
-    // 6. Offers banner
     renderOfferBanner();
 
-    // 7. Re-render grid now that reviews are loaded.
     renderGrid();
 
-    // 8. Wire up UI
     setupSearch();
     setupModal();
     setupCategoryStrip();
@@ -2548,7 +2669,6 @@
     setupReviewSort();
     setupLightbox();
 
-    // 9. Auth changes -> refresh review UI live.
     if (window.VionaAuth && typeof window.VionaAuth.onChange === 'function') {
       window.VionaAuth.onChange(function (user, profile) {
         state.currentUser = user || null;
@@ -2562,10 +2682,8 @@
       });
     }
 
-    // 10. Deep link
     handleDeepLink();
 
-    // 11. React to hash changes (back button etc.)
     window.addEventListener('hashchange', function () {
       if (!window.location.hash || window.location.hash.indexOf('#product=') !== 0) {
         if (state.currentProduct) closeProductModal();
@@ -2575,7 +2693,6 @@
       if (!m) return;
       var found = findProductByCodeOrId(m[1]);
       if (found) openProductById(found.id);
-      // Missing product -> open nothing.
     });
   }
 
