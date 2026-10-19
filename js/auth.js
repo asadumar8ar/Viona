@@ -33,6 +33,11 @@
      - Friendly English messages, try/catch everywhere, console.error on
        real failures.
 
+   Recent fix (this revision):
+     - M3: onForgotSubmit() now uses loginRedirectUrl() instead of a hardcoded
+       '/index.html' for redirectTo, so an admin resetting the password from
+       admin.html is sent back to admin.html (not the public home page).
+
    Notes:
    - Reads SUPABASE_URL / SUPABASE_ANON_KEY from window.VIONA_CONFIG.
    - Never stores passwords or personal data by hand.
@@ -1600,11 +1605,12 @@
 
     setBusy(btn, true, 'Sending…');
     try {
-      // redirectTo makes Supabase send the user back to index.html with a
-      // recovery token. The PASSWORD_RECOVERY event will open the
+      // M3: redirectTo uses loginRedirectUrl() so the user is sent back to
+      // the page they started from — admin.html for admins, index.html for
+      // public visitors. The PASSWORD_RECOVERY event will open the
       // "Set new password" modal.
       var res = await state.sb.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/index.html'
+        redirectTo: loginRedirectUrl()
       });
       if (res && res.error) throw res.error;
 
