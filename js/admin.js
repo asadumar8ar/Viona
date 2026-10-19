@@ -15,15 +15,12 @@
      - Offers & Settings tab: reads/writes the site_settings key/value table
      - Friendly toast messages, busy overlay, and error handling everywhere
 
-   Recent additions:
-     - Original price (MRP) column  -> saved in `old_price`
-     - Live "Offer: X% OFF" preview under the price fields
-     - Validation: MRP must be > price when filled
-     - Stock status column         -> saved in `stock_status`
-       (in_stock / low_stock / out_of_stock)
-     - Gold "X% OFF" badge + amber "Low stock" / red "Out of stock"
-       badges on the product list cards
-     - Stock filter in the products toolbar
+   Recent fixes (this revision):
+     - C1: saveSettings() now writes BOTH `offer_active` and `offer_enabled`
+       (so the public site's script.js works regardless of which key it reads).
+       applySettingsToForm() reads either key, whichever exists.
+     - M2: `offer_link` is now saved to / loaded from site_settings via the new
+       `#setOfferLink` input in admin.html.
    ============================================================================ */
 
 (function () {
@@ -1550,11 +1547,19 @@
   function applySettingsToForm(map) {
     map = map || {};
 
+    // C1: accept either offer_active or offer_enabled, whichever exists.
+    var enabledRaw = map.offer_active;
+    if (enabledRaw == null || enabledRaw === "") enabledRaw = map.offer_enabled;
+
     var sw = $("setOfferEnabled");
-    if (sw) sw.checked = String(map.offer_enabled || "").toLowerCase() === "true";
+    if (sw) sw.checked = String(enabledRaw || "").toLowerCase() === "true";
 
     var ta = $("setOfferText");
     if (ta) ta.value = map.offer_text || "";
+
+    // M2: offer_link field.
+    var ol = $("setOfferLink");
+    if (ol) ol.value = map.offer_link || "";
 
     var wa = $("setWhatsapp"); if (wa) wa.value = map.whatsapp_number || "";
     var ph = $("setPhone");    if (ph) ph.value = map.phone || "";
@@ -1598,6 +1603,7 @@
 
     var offerEnabled = $("setOfferEnabled");
     var offerText = $("setOfferText");
+    var offerLink = $("setOfferLink");           // M2
     var phone = $("setPhone");
     var email = $("setEmail");
     var address = $("setAddress");
@@ -1605,10 +1611,15 @@
     var instagram = $("setInstagram");
     var facebook = $("setFacebook");
 
+    var enabledStr = (offerEnabled && offerEnabled.checked) ? "true" : "false";
+
     // Keys must match what the public website reads.
+    // C1: write BOTH offer_active and offer_enabled so any reader works.
     var rows = [
-      { key: "offer_enabled",   value: (offerEnabled && offerEnabled.checked) ? "true" : "false" },
+      { key: "offer_active",    value: enabledStr },
+      { key: "offer_enabled",   value: enabledStr },
       { key: "offer_text",      value: offerText ? String(offerText.value || "") : "" },
+      { key: "offer_link",      value: offerLink ? String(offerLink.value || "").trim() : "" },
       { key: "whatsapp_number", value: wa },
       { key: "delivery_note",   value: delivery ? String(delivery.value || "") : "" },
       { key: "phone",           value: phone ? String(phone.value || "") : "" },
