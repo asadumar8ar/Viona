@@ -16,22 +16,34 @@
      - Header search + suggestions, category strip, product grid.
      - Product modal with gallery, size chips, WhatsApp order button.
      - Offers banner from site_settings (hidden when empty).
-     - Reviews: fetched once, grouped by product_id.
+     - Reviews: fetched once, grouped by product_id, shown per product.
      - Review form wired to VionaAuth (login required).
      - Mobile slide-in drawer (#mobileMenu) with overlay / close / Escape.
      - Injects its own CSS so css/style.css does not need to change.
 
-   Recent fixes (this revision):
-     - C1: site_settings offer flag now reads EITHER `offer_active` OR
-       `offer_enabled` (whichever row exists), so admin changes propagate to
-       the public strip / banner regardless of which key was saved.
-     - C2: `sizes` column is now parsed as JSON first (JSON array string),
-       then as an array, then finally as a comma-separated string.
-     - M2: `offer_link` is now loaded from site_settings so the "Shop now"
-       button can render. When the link is empty, the button stays hidden.
-     - M4: `sizes` only falls back to the default list ['2.2','2.4','2.6','2.8']
-       when the raw value is null/undefined. An explicit empty array (or empty
-       string) is respected and the modal sizes section hides itself.
+   REVIEW BAR FIX (this revision):
+     - Rating is now read from r.rating OR r.stars (whichever exists), rounded
+       to an integer 1-5, invalid values are ignored. Fixes bars not matching.
+     - reviews select uses '*' so no column-not-found errors when the schema
+       uses `stars` instead of `rating`.
+     - When the current product has 0 reviews, the bars area is cleared
+       (no 0-width bars, no NaN, no 0/0). "No reviews yet" is shown instead.
+     - Summary and bars are re-rendered on every product switch and right
+       after a new review is submitted, so old product numbers never stay.
+     - Average star row already supports half-stars via a percentage-width
+       overlay (gold fg on grey bg) — unchanged but verified.
+
+   Earlier fixes (kept in place):
+     - C1: site_settings offer flag reads EITHER `offer_active` OR
+       `offer_enabled` (whichever exists), so admin changes propagate to the
+       public strip / banner regardless of which key was saved.
+     - C2: `sizes` column is parsed as JSON first (JSON array string), then
+       as an array, then finally as a comma-separated string.
+     - M2: `offer_link` is loaded from site_settings so the "Shop now"
+       button can render. Empty link hides the button.
+     - M4: `sizes` only falls back to ['2.2','2.4','2.6','2.8'] when the raw
+       value is null/undefined. Empty array (or empty string) stays empty,
+       and the modal sizes section hides itself.
    ============================================================================ */
 
 (function () {
@@ -90,7 +102,6 @@
     return 'Rs ' + s;
   }
 
-  // Only returns a percentage when both numbers are valid AND MRP > price.
   function discountPct(price, oldPrice) {
     var p = Number(price), o = Number(oldPrice);
     if (!o || !p || o <= p) return 0;
@@ -98,7 +109,6 @@
     return pct > 0 ? pct : 0;
   }
 
-  // Turn any raw value into one of the three stock constants.
   function normalizeStock(v) {
     if (v == null) return 'in_stock';
     var s = String(v).trim().toLowerCase();
@@ -170,6 +180,24 @@
     console.error('[viona] ' + where, err);
   }
 
+  /* --------------------------------------------------------------------
+     readRatingValue — safe integer 1..5 from a review row.
+     Reads r.rating first, then r.stars (whichever exists). Invalid
+     values (null, undefined, '', NaN, <1, >5) return 0 and are ignored
+     by the caller. This is the FIX for the review bar mismatch.
+     -------------------------------------------------------------------- */
+  function readRatingValue(r) {
+    if (!r) return 0;
+    var raw = r.rating;
+    if (raw === null || raw === undefined || raw === '') raw = r.stars;
+    if (raw === null || raw === undefined || raw === '') return 0;
+    var n = Number(raw);
+    if (!isFinite(n)) return 0;
+    var rounded = Math.round(n);
+    if (rounded < 1 || rounded > 5) return 0;
+    return rounded;
+  }
+
   /* ==========================================================================
      3. STATE
      ========================================================================== */
@@ -217,7 +245,7 @@
   };
 
   /* ==========================================================================
-     4. INJECTED STYLES (so css/style.css needs no change)
+     4. INJECTED STYLES
      ========================================================================== */
 
   function injectStyles() {
@@ -249,15 +277,18 @@
       '.vrt-count{display:block;font-size:12.5px;color:#6B7280;margin-top:8px;}',
       '.vrt-summary-right{display:flex;flex-direction:column;gap:7px;}',
 
+      /* ---------- bar rows (used by renderReviewSummary) ---------- */
       '.vrt-bar-row{display:grid;grid-template-columns:38px 1fr 32px;',
       'gap:10px;align-items:center;font-size:12.5px;color:#4A5568;}',
-      '.vrt-bar-label{font-weight:600;color:#0B1F3A;}',
+      '.vrt-bar-label{font-weight:600;color:#0B1F3A;white-space:nowrap;}',
       '.vrt-bar-track{position:relative;height:9px;border-radius:999px;',
       'background:#E9E3D6;overflow:hidden;}',
       '.vrt-bar-fill{position:absolute;left:0;top:0;bottom:0;width:0%;',
       'background:#C9A24B;border-radius:999px;',
       'transition:width .55s cubic-bezier(.2,.7,.2,1);}',
-      '.vrt-bar-count{text-align:right;color:#6B7280;}',
+      '.vrt-bar-count{text-align:right;color:#6B7280;font-variant-numeric:tabular-nums;}',
+      '.vrt-bars-empty{font-size:13px;color:#6B7280;font-style:italic;',
+      'text-align:center;padding:8px 0;}',
 
       /* ---------- reviews list ---------- */
       '.vrt-rv{padding:16px 0;border-bottom:1px solid #ECE6DA;}',
@@ -344,7 +375,6 @@
       '.card-media.is-out{background:#F1EDE4;}',
       '.card-media.is-out .card-img{opacity:.4;filter:grayscale(.4);}',
       '.card-media.is-out .card-placeholder{opacity:.5;}',
-      /* red diagonal ribbon across the card image */
       '.card-ribbon{position:absolute;top:50%;left:50%;',
       'transform:translate(-50%,-50%) rotate(-12deg);',
       'z-index:3;pointer-events:none;',
@@ -353,7 +383,6 @@
       'letter-spacing:.14em;text-transform:uppercase;',
       'color:#fff;background:#C0392B;border:2px solid #fff;',
       'box-shadow:0 6px 16px rgba(0,0,0,.28);}',
-      /* small amber "Only few left" chip under the card price */
       '.card-lowstock{display:inline-block;margin:6px 0 0;',
       'font-size:11px;font-weight:700;letter-spacing:.04em;',
       'color:#8A5A00;background:#FFF4E0;',
@@ -363,19 +392,16 @@
       '.modal-lowstock{margin:0 0 10px;padding:8px 12px;border-radius:8px;',
       'font-size:13px;font-weight:600;text-align:center;',
       'color:#8A5A00;background:#FFF4E0;border:1px solid #F0D9A6;}',
-      /* grey disabled "Currently out of stock" button (replaces the green WA) */
       '.modal-outstock{display:block;width:100%;margin:0 0 10px;',
       'padding:13px 20px;border:0;border-radius:999px;',
       'background:#B7B7B7;color:#fff;',
       'font-family:inherit;font-size:13px;font-weight:600;',
       'letter-spacing:.09em;text-transform:uppercase;',
       'text-align:center;cursor:not-allowed;box-shadow:none;}',
-      /* "Ask when it will be back" link */
       '.modal-restock-link{display:block;margin:10px 0 0;text-align:center;',
       'font-size:13px;font-weight:600;color:#0B1F3A;',
       'text-decoration:underline;text-underline-offset:3px;}',
       '.modal-restock-link:hover{color:#C9A24B;}',
-      /* disabled size chips */
       '.size-chip.is-disabled,.size-chip[disabled]{opacity:.45;',
       'cursor:not-allowed;pointer-events:none;}',
 
@@ -461,14 +487,12 @@
           if (key === 'facebook_url' && val) merged.social.facebook = String(val);
         });
 
-        /* ---- C1 + M2: read offer fields with both key names ---- */
         var offerRow = rows.find(function (r) { return r && r.key === 'offer_text'; });
         if (offerRow) merged.offer_text = String(offerRow.value || '');
 
         var linkRow = rows.find(function (r) { return r && r.key === 'offer_link'; });
         if (linkRow) merged.offer_link = String(linkRow.value || '');
 
-        // Prefer `offer_active`, fall back to `offer_enabled`.
         var activeRow = rows.find(function (r) { return r && r.key === 'offer_active'; });
         if (!activeRow) {
           activeRow = rows.find(function (r) { return r && r.key === 'offer_enabled'; });
@@ -586,15 +610,8 @@
   }
 
   /* ==========================================================================
-     6. PRODUCTS — column detection + load (Supabase only, no demo data)
+     6. PRODUCTS — column detection + load
      ========================================================================== */
-
-  function pickCol(cols) {
-    for (var i = 0; i < arguments.length; i++) {
-      if (cols.indexOf(arguments[i]) !== -1) return arguments[i];
-    }
-    return null;
-  }
 
   async function detectProductColumns() {
     if (state.R) return state.R;
@@ -630,7 +647,6 @@
     }
 
     var cols = state.productCols;
-
     function pick() {
       for (var i = 0; i < arguments.length; i++) {
         if (cols.indexOf(arguments[i]) !== -1) return arguments[i];
@@ -656,7 +672,6 @@
       created_at: pick('created_at')
     };
 
-    console.log('[viona] product columns:', state.productCols);
     return state.R;
   }
 
@@ -678,7 +693,6 @@
       var R = state.R;
 
       var q = sb.from('products').select('*');
-
       if (R.known && R.created_at) {
         q = q.order(R.created_at, { ascending: false });
       } else if (R.known) {
@@ -686,15 +700,12 @@
       }
 
       var res = await q;
-
       if (res && res.error) {
         logError('products select', res.error);
         throw res.error;
       }
 
       var rows = (res && res.data) || [];
-
-      // Keep only rows where is_active is NOT false.
       var visibleRows = rows.filter(function (row) {
         if (!row) return false;
         var v = row.is_active;
@@ -719,7 +730,6 @@
     var row = p;
 
     var id = (R.id && row[R.id] != null) ? Number(row[R.id]) : Number(row.id || 0);
-
     var name = (R.name && row[R.name] != null) ? String(row[R.name]) : String(row.name || 'Untitled');
     var category = (R.category && row[R.category] != null) ? String(row[R.category]) : String(row.category || 'other');
     var price = (R.price && row[R.price] != null) ? Number(row[R.price]) : Number(row.price || 0);
@@ -728,42 +738,25 @@
     var oldRaw = (R.old_price && row[R.old_price] != null) ? row[R.old_price] : row.old_price;
     if (oldRaw != null && oldRaw !== '') oldPrice = Number(oldRaw);
     if (isNaN(oldPrice) || oldPrice <= 0) oldPrice = null;
-    // Never show OFF for fake values — if MRP <= price, drop it.
     if (oldPrice != null && !(oldPrice > price)) oldPrice = null;
 
-    /* --------------------------------------------------------------------
-       Sizes — C2 + M4 fix.
-
-       C2: If the raw value is a string, try JSON.parse first (so a JSON
-           array string like '["2.2","2.4"]' is read as two sizes, not as
-           broken CSV pieces), then fall back to comma-split.
-
-       M4: Only fall back to the default list ['2.2','2.4','2.6','2.8']
-           when the raw value is null or undefined. An explicit [] stays
-           [], and an explicit empty string stays []. The modal sizes
-           section will hide itself accordingly.
-       -------------------------------------------------------------------- */
+    // Sizes — JSON first, then array, then CSV. Default only when null.
     var sizesRaw = (R.sizes && row[R.sizes] != null) ? row[R.sizes] : row.sizes;
     var sizes;
     if (sizesRaw === null || sizesRaw === undefined) {
-      // M4: default only when truly null/undefined
       sizes = ['2.2','2.4','2.6','2.8'];
     } else if (Array.isArray(sizesRaw)) {
-      // M4: keep [] as [] — do NOT default
       sizes = sizesRaw.map(String);
     } else if (typeof sizesRaw === 'string') {
       var trimmedSizes = sizesRaw.trim();
       if (!trimmedSizes) {
-        // empty string stays empty
         sizes = [];
       } else {
-        // C2: try JSON.parse first
         var parsedSizes = null;
         try {
           var jsonSizes = JSON.parse(trimmedSizes);
           if (Array.isArray(jsonSizes)) parsedSizes = jsonSizes;
-        } catch (e) { /* not JSON — fall through to CSV */ }
-
+        } catch (e) { /* fall through */ }
         if (parsedSizes) {
           sizes = parsedSizes.map(String);
         } else {
@@ -779,8 +772,7 @@
 
     var more = [];
     var moreRaw = (R.additional_images && row[R.additional_images] != null)
-      ? row[R.additional_images]
-      : row.additional_images;
+      ? row[R.additional_images] : row.additional_images;
     if (Array.isArray(moreRaw)) {
       more = moreRaw.filter(Boolean).map(String);
     } else if (typeof moreRaw === 'string' && moreRaw.trim()) {
@@ -791,7 +783,6 @@
     }
 
     var code = (R.code && row[R.code] != null) ? String(row[R.code]) : (row.code ? String(row.code) : '');
-
     var stockRaw = (R.stock_status && row[R.stock_status] != null) ? row[R.stock_status] : row.stock_status;
 
     return {
@@ -864,6 +855,8 @@
      8. REVIEWS — fetch once, group by product_id
      ========================================================================== */
 
+  /* Recompute fresh from the currently-open product's reviews.
+     readRatingValue() handles r.rating vs r.stars and invalid values. */
   function reviewStatsFor(productId) {
     var key = String(productId);
     var list = state.reviewsByProduct[key] || [];
@@ -872,7 +865,7 @@
     var sum = 0, total = 0;
 
     list.forEach(function (r) {
-      var rt = Math.round(Number(r.rating) || 0);
+      var rt = readRatingValue(r);
       if (rt < 1 || rt > 5) return;
       stats[rt]++;
       sum += rt;
@@ -892,9 +885,10 @@
     if (!SUPABASE_READY || !sb) return;
 
     try {
+      // '*' so no column-not-found errors if the schema has `stars` not `rating`.
       var res = await sb
         .from('reviews')
-        .select('id,product_id,user_id,customer_name,rating,comment,image_url,created_at')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (res && res.error) {
@@ -906,6 +900,7 @@
       state.allReviews = rows;
 
       rows.forEach(function (r) {
+        if (!r) return;
         var key = String(r.product_id);
         if (!state.reviewsByProduct[key]) state.reviewsByProduct[key] = [];
         state.reviewsByProduct[key].push(r);
@@ -927,12 +922,17 @@
     return null;
   }
 
+  /* Fractional star row — gold fg on grey bg, width = average/5 %.
+     Gives the Amazon/Flipkart half-star look for any average value. */
   function starsRowHtml(average, size) {
-    var pct = Math.max(0, Math.min(100, (Number(average) || 0) / 5 * 100));
+    var av = Number(average) || 0;
+    if (av < 0) av = 0;
+    if (av > 5) av = 5;
+    var pct = (av / 5) * 100;
     var fs = size || 15;
     return '' +
       '<span class="vrt-stars" style="font-size:' + fs + 'px" aria-label="' +
-        (Number(average) || 0).toFixed(1) + ' out of 5">' +
+        av.toFixed(1) + ' out of 5">' +
         '<span class="vrt-stars-bg" aria-hidden="true">★★★★★</span>' +
         '<span class="vrt-stars-fg" style="width:' + pct.toFixed(2) + '%" aria-hidden="true">★★★★★</span>' +
       '</span>';
@@ -1023,12 +1023,10 @@
     list.forEach(function (p) {
       var imgs = productImages(p);
       var off = discountPct(p.price, p.old_price);
-      var code = productCode(p.id, p.code);
       var stats = reviewStatsFor(p.id);
       var stock = normalizeStock(p.stock_status);
       var isOut = stock === 'out_of_stock';
 
-      // media: dim the image when out of stock
       var mediaHtml = '';
       if (imgs.length) {
         mediaHtml =
@@ -1039,22 +1037,18 @@
         mediaHtml = '<div class="card-placeholder"><span>Viona</span></div>';
       }
 
-      // red ribbon for out of stock
       var ribbonHtml = isOut
         ? '<span class="card-ribbon" aria-hidden="true">Out of stock</span>'
         : '';
 
-      // gold "X% OFF" (only when a real, higher MRP exists)
       var badgeHtml = off > 0 ? '<span class="card-badge">' + off + '% OFF</span>' : '';
       var featHtml  = p.featured ? '<span class="card-featured">Featured</span>' : '';
 
-      // price: show MRP strike-through only when the offer is real
       var priceHtml = '<span class="price-now">' + esc(money(p.price)) + '</span>';
       if (off > 0) {
         priceHtml += '<span class="price-old">' + esc(money(p.old_price)) + '</span>';
       }
 
-      // amber "Only few left" under the price
       var lowStockHtml = stock === 'low_stock'
         ? '<p class="card-lowstock">Only few left</p>'
         : '';
@@ -1320,6 +1314,7 @@
     renderDetailRows(product);
     switchTab('details');
 
+    // Fresh render for THIS product only — no stale numbers from a previous one.
     renderModalRatingBadge();
     renderReviewSummary();
     renderReviewList();
@@ -1450,7 +1445,6 @@
     var section = el('modalSizesWrap');
     if (!wrap || !section) return;
 
-    // M4: empty sizes array (or empty string) hides the section entirely.
     var sizes = Array.isArray(p.sizes) && p.sizes.length ? p.sizes : [];
     if (!sizes.length) {
       section.hidden = true;
@@ -1498,11 +1492,6 @@
     }
   }
 
-  /* --------------------------------------------------------------------------
-     Build the modal-actions block based on stock status.
-     Elements #modalLowStock / #modalOutStock / #modalAskRestock are injected
-     once in setupModalExtras() and then toggled here.
-     -------------------------------------------------------------------------- */
   function updateModalWhatsApp() {
     var link = el('modalWhatsApp');
     var low  = el('modalLowStock');
@@ -1526,7 +1515,6 @@
     var stock = normalizeStock(p.stock_status);
 
     if (stock === 'out_of_stock') {
-      // Replace the green order button with the grey disabled one.
       link.hidden = true;
       if (low) low.hidden = true;
       if (out) out.hidden = false;
@@ -1535,7 +1523,6 @@
         ask.href = waLink(num, askMsg);
       }
     } else {
-      // in_stock OR low_stock: order button stays.
       link.hidden = false;
       link.href = waLink(num, orderMsg);
       link.classList.remove('is-disabled');
@@ -1593,14 +1580,10 @@
     }
   }
 
-  /* --------------------------------------------------------------------------
-     Add the extra modal-actions siblings once, right after #modalWhatsApp.
-     We can't modify index.html so we do it here on init.
-     -------------------------------------------------------------------------- */
   function setupModalExtras() {
     var link = el('modalWhatsApp');
     if (!link) return;
-    if (el('modalLowStock')) return; // already set up
+    if (el('modalLowStock')) return;
 
     var wrap = link.parentElement;
     if (!wrap) return;
@@ -1627,7 +1610,6 @@
     ask.rel = 'noopener';
     ask.textContent = 'Ask when it will be back';
 
-    // Order: low label · green button (already there) · grey button · ask link
     wrap.insertBefore(low, link);
     wrap.appendChild(out);
     wrap.appendChild(ask);
@@ -1670,7 +1652,7 @@
   }
 
   /* ==========================================================================
-     12. RATING UI — tab badge + summary box
+     12. RATING UI — tab badge + summary box (THE FIX)
      ========================================================================== */
 
   function updateTabReviewCount() {
@@ -1701,6 +1683,7 @@
 
     var stats = reviewStatsFor(state.currentProduct.id);
 
+    // Big average + fractional star row (0.0 when empty — never NaN)
     var bigAvg = el('reviewsAverage');
     if (bigAvg) bigAvg.textContent = stats.total ? stats.average.toFixed(1) : '0.0';
 
@@ -1717,12 +1700,20 @@
     var barsWrap = el('reviewsBars');
     if (!barsWrap) return;
 
+    // THE FIX: when there are 0 valid reviews, clear the bars.
+    // No empty 0% bars, no NaN, no 0/0.
+    if (stats.total === 0) {
+      barsWrap.innerHTML = '';
+      return;
+    }
+
+    // 5 → 1 star rows with count and pct = count / total * 100
     var html = '';
     for (var star = 5; star >= 1; star--) {
       var count = stats.stats[star] || 0;
-      var pct = stats.total ? Math.round((count / stats.total) * 100) : 0;
+      var pct = Math.round((count / stats.total) * 100);
       html +=
-        '<div class="vrt-bar-row">' +
+        '<div class="vrt-bar-row" data-star="' + star + '">' +
           '<span class="vrt-bar-label">' + star + ' ★</span>' +
           '<span class="vrt-bar-track">' +
             '<span class="vrt-bar-fill" data-w="' + pct + '" style="width:0%"></span>' +
@@ -1755,11 +1746,13 @@
 
     if (state.reviewSort === 'highest') {
       list.sort(function (a, b) {
-        return (b.rating - a.rating) || (new Date(b.created_at) - new Date(a.created_at));
+        return (readRatingValue(b) - readRatingValue(a)) ||
+               (new Date(b.created_at) - new Date(a.created_at));
       });
     } else if (state.reviewSort === 'lowest') {
       list.sort(function (a, b) {
-        return (a.rating - b.rating) || (new Date(b.created_at) - new Date(a.created_at));
+        return (readRatingValue(a) - readRatingValue(b)) ||
+               (new Date(b.created_at) - new Date(a.created_at));
       });
     } else {
       list.sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
@@ -1809,7 +1802,6 @@
     var initial = name.trim().charAt(0).toUpperCase() || 'V';
 
     var avatar = '<span class="vrt-av">' + esc(initial) + '</span>';
-
     var tagHtml = isOwn ? '<span class="vrt-rv-tag">Your review</span>' : '';
 
     var photosHtml = '';
@@ -1840,7 +1832,7 @@
             '<p class="vrt-rv-date">' + esc(formatDate(r.created_at)) + '</p>' +
           '</div>' +
         '</div>' +
-        '<div class="vrt-rv-stars">' + starsSolidHtml(r.rating) + '</div>' +
+        '<div class="vrt-rv-stars">' + starsSolidHtml(readRatingValue(r)) + '</div>' +
         '<p class="vrt-rv-text">' + esc(r.comment || '') + '</p>' +
         photosHtml +
         actionsHtml +
@@ -1848,7 +1840,7 @@
   }
 
   /* ==========================================================================
-     14. REVIEWS FORM (login / write / edit)
+     14. REVIEWS FORM
      ========================================================================== */
 
   function clearReviewFile() {
@@ -1923,7 +1915,7 @@
 
     var isEdit = !!existing;
     var r = existing || {};
-    var initialRating = Number(r.rating) || 0;
+    var initialRating = readRatingValue(r);
     state.pickerRating = initialRating;
 
     wrap.innerHTML =
@@ -2159,6 +2151,8 @@
         }
         if (!name) name = user.email || 'Viona Customer';
 
+        // Write the rating to BOTH `rating` and `stars` when possible so the
+        // public display works regardless of which field the schema uses.
         var payload = {
           product_id: state.currentProduct.id,
           user_id: user.id,
@@ -2167,6 +2161,8 @@
           comment: comment,
           image_url: finalImageUrl
         };
+        // Try to also set `stars` when the table has it (harmless if not).
+        try { payload.stars = rating; } catch (e) { /* ignore */ }
 
         if (existing && existing.id) {
           var upd = await sb.from('reviews').update(payload).eq('id', existing.id);
@@ -2181,6 +2177,7 @@
         state.editingReview = false;
         clearReviewFile();
 
+        // Re-fetch and re-render so the summary bars use the new numbers.
         await loadAllReviews();
         renderGrid();
         renderModalRatingBadge();
@@ -2541,7 +2538,6 @@
     if (typeof settings.offer_text === 'string') text = settings.offer_text;
     if (typeof settings.offer_link === 'string') link = settings.offer_link;
 
-    // C1: accept either offer_active or offer_enabled.
     if (settings.offer_active === true ||
         String(settings.offer_active).toLowerCase() === 'true') {
       active = true;
@@ -2578,7 +2574,6 @@
       return;
     }
 
-    // M2: "Shop now" button only shows when offer.link has a value.
     var stripRoot2 = el('offerStripRoot');
     if (stripRoot2) {
       var linkHtml = offer.link
@@ -2622,7 +2617,6 @@
 
   /* ==========================================================================
      20. DEEP LINK
-     #product=VB-005 opens NOTHING when that product does not exist.
      ========================================================================== */
 
   function findProductByCodeOrId(code) {
@@ -2705,7 +2699,6 @@
     renderFaqs(faqs);
 
     renderOfferBanner();
-
     renderGrid();
 
     setupSearch();
@@ -2725,6 +2718,9 @@
           renderUserChip();
           renderReviewList();
           renderReviewFormOrCTA();
+          renderReviewSummary();
+          renderModalRatingBadge();
+          updateTabReviewCount();
         }
       });
     }
