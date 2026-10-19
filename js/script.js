@@ -21,21 +21,17 @@
      - Mobile slide-in drawer (#mobileMenu) with overlay / close / Escape.
      - Injects its own CSS so css/style.css does not need to change.
 
-   Recent additions:
-     - Original price (MRP) is read from `old_price`. When MRP > price the
-       card / modal show the strike-through MRP plus a gold "X% OFF" badge.
-       Otherwise only the price is shown. Fake / invalid values never show OFF.
-     - `stock_status` column is read. Values:
-         • in_stock      -> nothing extra
-         • low_stock     -> amber "Only few left" label on card + modal
-         • out_of_stock  -> dim image + red ribbon on card;
-                            grey "Currently out of stock" button in modal,
-                            size chips disabled, plus an "Ask when it will
-                            be back" link that opens WhatsApp with the
-                            product code.
-       Out-of-stock products still appear in the grid (unless is_active is
-       false), so category counts / search / filters keep working.
-     - Deep link #product=VB-001 opens NOTHING when the product does not exist.
+   Recent fixes (this revision):
+     - C1: site_settings offer flag now reads EITHER `offer_active` OR
+       `offer_enabled` (whichever row exists), so admin changes propagate to
+       the public strip / banner regardless of which key was saved.
+     - C2: `sizes` column is now parsed as JSON first (JSON array string),
+       then as an array, then finally as a comma-separated string.
+     - M2: `offer_link` is now loaded from site_settings so the "Shop now"
+       button can render. When the link is empty, the button stays hidden.
+     - M4: `sizes` only falls back to the default list ['2.2','2.4','2.6','2.8']
+       when the raw value is null/undefined. An explicit empty array (or empty
+       string) is respected and the modal sizes section hides itself.
    ============================================================================ */
 
 (function () {
@@ -465,12 +461,23 @@
           if (key === 'facebook_url' && val) merged.social.facebook = String(val);
         });
 
+        /* ---- C1 + M2: read offer fields with both key names ---- */
         var offerRow = rows.find(function (r) { return r && r.key === 'offer_text'; });
         if (offerRow) merged.offer_text = String(offerRow.value || '');
+
+        var linkRow = rows.find(function (r) { return r && r.key === 'offer_link'; });
+        if (linkRow) merged.offer_link = String(linkRow.value || '');
+
+        // Prefer `offer_active`, fall back to `offer_enabled`.
         var activeRow = rows.find(function (r) { return r && r.key === 'offer_active'; });
+        if (!activeRow) {
+          activeRow = rows.find(function (r) { return r && r.key === 'offer_enabled'; });
+        }
         if (activeRow) {
-          merged.offer_active = (activeRow.value === true ||
-                                 String(activeRow.value).toLowerCase() === 'true');
+          var activeVal = (activeRow.value === true ||
+                           String(activeRow.value).toLowerCase() === 'true');
+          merged.offer_active = activeVal;
+          merged.offer_enabled = activeVal;
         }
       } else {
         var first = rows[0] || {};
@@ -724,14 +731,47 @@
     // Never show OFF for fake values — if MRP <= price, drop it.
     if (oldPrice != null && !(oldPrice > price)) oldPrice = null;
 
+    /* --------------------------------------------------------------------
+       Sizes — C2 + M4 fix.
+
+       C2: If the raw value is a string, try JSON.parse first (so a JSON
+           array string like '["2.2","2.4"]' is read as two sizes, not as
+           broken CSV pieces), then fall back to comma-split.
+
+       M4: Only fall back to the default list ['2.2','2.4','2.6','2.8']
+           when the raw value is null or undefined. An explicit [] stays
+           [], and an explicit empty string stays []. The modal sizes
+           section will hide itself accordingly.
+       -------------------------------------------------------------------- */
     var sizesRaw = (R.sizes && row[R.sizes] != null) ? row[R.sizes] : row.sizes;
     var sizes;
-    if (Array.isArray(sizesRaw)) {
-      sizes = sizesRaw.map(String);
-    } else if (typeof sizesRaw === 'string' && sizesRaw.trim()) {
-      sizes = sizesRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-    } else {
+    if (sizesRaw === null || sizesRaw === undefined) {
+      // M4: default only when truly null/undefined
       sizes = ['2.2','2.4','2.6','2.8'];
+    } else if (Array.isArray(sizesRaw)) {
+      // M4: keep [] as [] — do NOT default
+      sizes = sizesRaw.map(String);
+    } else if (typeof sizesRaw === 'string') {
+      var trimmedSizes = sizesRaw.trim();
+      if (!trimmedSizes) {
+        // empty string stays empty
+        sizes = [];
+      } else {
+        // C2: try JSON.parse first
+        var parsedSizes = null;
+        try {
+          var jsonSizes = JSON.parse(trimmedSizes);
+          if (Array.isArray(jsonSizes)) parsedSizes = jsonSizes;
+        } catch (e) { /* not JSON — fall through to CSV */ }
+
+        if (parsedSizes) {
+          sizes = parsedSizes.map(String);
+        } else {
+          sizes = trimmedSizes.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        }
+      }
+    } else {
+      sizes = [];
     }
 
     var desc = (R.description && row[R.description] != null) ? String(row[R.description]) : String(row.description || '');
@@ -1410,6 +1450,7 @@
     var section = el('modalSizesWrap');
     if (!wrap || !section) return;
 
+    // M4: empty sizes array (or empty string) hides the section entirely.
     var sizes = Array.isArray(p.sizes) && p.sizes.length ? p.sizes : [];
     if (!sizes.length) {
       section.hidden = true;
@@ -2500,14 +2541,19 @@
     if (typeof settings.offer_text === 'string') text = settings.offer_text;
     if (typeof settings.offer_link === 'string') link = settings.offer_link;
 
+    // C1: accept either offer_active or offer_enabled.
     if (settings.offer_active === true ||
         String(settings.offer_active).toLowerCase() === 'true') {
+      active = true;
+    }
+    if (!active && (settings.offer_enabled === true ||
+        String(settings.offer_enabled).toLowerCase() === 'true')) {
       active = true;
     }
 
     if (!text && settings.offer && typeof settings.offer === 'object') {
       if (settings.offer.text) text = String(settings.offer.text);
-      if (settings.offer.link) link = String(settings.offer.link);
+      if (settings.offer.link && !link) link = String(settings.offer.link);
       if (settings.offer.active === true ||
           String(settings.offer.active).toLowerCase() === 'true') {
         active = true;
@@ -2532,6 +2578,7 @@
       return;
     }
 
+    // M2: "Shop now" button only shows when offer.link has a value.
     var stripRoot2 = el('offerStripRoot');
     if (stripRoot2) {
       var linkHtml = offer.link
