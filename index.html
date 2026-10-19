@@ -36,15 +36,16 @@
     .brand-tagline { font-size: 14px; margin-bottom: 16px; padding: 0 8px; }
   }
 
-  /* Multi-line text (textarea fields from site_content) */
+  /* Multi-line text from site_content textareas */
   #aboutText,
   #heroText,
   #footerText,
-  #contactAddressText {
+  #contactAddressText,
+  #emptyText {
     white-space: pre-line;
   }
 
-  /* Footer tagline / blurb text */
+  /* Footer blurb text */
   #footerText {
     font-size: 13px;
     color: rgba(255,255,255,.58);
@@ -85,7 +86,7 @@
   .footer-social-link svg { width: 18px; height: 18px; display: block; }
   .footer-social-link[hidden] { display: none !important; }
 
-  /* Contact card: keep the address paragraph tidy */
+  /* Contact card — address text stays readable */
   #contactAddressText {
     font-size: 14px;
     color: var(--navy, #0B1F3A);
@@ -129,7 +130,7 @@
             <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
           </svg>
         </span>
-        <!-- Search placeholder is editable via site_content.search_placeholder -->
+        <!-- Search placeholder editable via site_content.search_placeholder -->
         <input type="text"
                id="searchInput"
                class="search-input"
@@ -238,7 +239,7 @@
 <main id="top">
 
   <!-- ========================================================================
-       HERO
+       HERO — editable title/subtitle/button + tagline
        ======================================================================== -->
   <section class="hero" id="hero">
     <div class="hero-inner container">
@@ -251,15 +252,12 @@
 
       <p class="hero-label" id="heroLabel">Handcrafted in Gaya, Bihar</p>
 
-      <!-- Editable title from site_content.hero_title -->
       <h1 class="hero-heading" id="heroHeading" data-content="hero_title">Timeless Bangles, Made for You</h1>
 
-      <!-- Editable tagline from site_content.tagline -->
       <p class="brand-tagline" id="brandTagline" data-content="tagline">Where tradition meets timeless elegance — handcrafted, premium, and made for you.</p>
 
-      <!-- Editable subtitle from site_content.hero_subtitle (textarea) -->
       <p class="hero-text" id="heroText" data-content="hero_subtitle">
-        Premium handcrafted glass and traditional bangles, handpicked for every occasion.
+        Premium handcrafted glass and traditional bangles, handpicked for every occasion. Perfect for brides, festivals, and gifts — delivered across India in 5-7 working days.
       </p>
 
       <div class="hero-actions">
@@ -281,7 +279,7 @@
   </section>
 
   <!-- ========================================================================
-       COLLECTIONS
+       COLLECTIONS — editable title/subtitle
        ======================================================================== -->
   <section class="collections" id="collections">
     <div class="container">
@@ -314,7 +312,7 @@
   </section>
 
   <!-- ========================================================================
-       ABOUT — brand story (site_content.about_title / about_text)
+       ABOUT — editable about_title / about_text from site_content
        ======================================================================== -->
   <section class="about" id="about">
     <div class="container about-inner">
@@ -356,7 +354,8 @@
   </section>
 
   <!-- ========================================================================
-       CONTACT — all key fields editable from site_content
+       CONTACT — editable contact_title, contact_phone, contact_city,
+       contact_address, working_hours from site_content
        ======================================================================== -->
   <section class="contact" id="contact">
     <div class="container">
@@ -377,7 +376,7 @@
             </li>
             <li>
               <span class="contact-label">Address</span>
-              <span id="contactAddressText" data-content="contact_address">Gaya, Bihar, India</span>
+              <span id="contactAddressText" data-content="contact_address">Viona Bangles Workshop, Gaya, Bihar, India</span>
             </li>
             <li>
               <span class="contact-label">Working Hours</span>
@@ -414,7 +413,7 @@
 </main>
 
 <!-- ==========================================================================
-     FOOTER
+     FOOTER — editable footer_text, footer_copyright, social links
      ========================================================================== -->
 <footer class="site-footer">
   <div class="container footer-inner">
@@ -429,10 +428,8 @@
       <p class="footer-tagline">ELEGANT BANGLES</p>
       <p class="footer-sub">Made for You</p>
 
-      <!-- Editable footer blurb (site_content.footer_text) -->
-      <p class="footer-text" id="footerText" data-content="footer_text">Elegant bangles, handcrafted with love in Gaya, Bihar. Each piece is checked by hand before it reaches you.</p>
+      <p class="footer-text" id="footerText" data-content="footer_text">Elegant bangles, handcrafted with love in Gaya, Bihar. Each piece is checked by hand before it reaches you. Order easily on WhatsApp — delivery across India in 5-7 working days.</p>
 
-      <!-- Social links — hidden until a URL exists in site_content -->
       <div class="footer-social" id="footerSocial">
         <a class="footer-social-link" id="igLink" href="#" target="_blank" rel="noopener"
            aria-label="Instagram" data-content-href="instagram_url" hidden>
@@ -522,6 +519,7 @@
 
         <p class="modal-desc" id="modalDesc"></p>
 
+        <!-- Sizes — filled by js/script.js (ALL_SIZES + product sizes, Amazon-style cross on unavailable) -->
         <div class="modal-sizes" id="modalSizesWrap">
           <p class="field-label">Select size</p>
           <div class="size-chips" id="modalSizes" role="radiogroup"
@@ -612,14 +610,17 @@
 </div>
 
 <!-- ==========================================================================
-     POPUP ROOT + TOAST
+     POPUP ROOT (size-unavailable popup is injected here by js/script.js)
      ========================================================================== -->
 <div id="popupRoot" class="popup-root"></div>
+
+<!-- ==========================================================================
+     TOAST
+     ========================================================================== -->
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- ==========================================================================
      SCRIPTS — order: config → auth → brand → script
-     (brand.js BEFORE script.js so site_content is loaded first)
      ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
