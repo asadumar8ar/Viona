@@ -2,26 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Viona Bangles — Premium Handcrafted Bangles from Gaya, Bihar</title>
 <meta name="description" content="Viona Bangles — premium handcrafted glass and traditional bangles from Gaya, Bihar. Timeless designs, handpicked for every occasion." />
 <meta name="theme-color" content="#0B1F3A" />
 
-<!-- Favicon -->
 <link rel="icon" type="image/png" href="images/favicon.png" />
 <link rel="apple-touch-icon" href="images/favicon.png" />
 
-<!-- Google Fonts: Playfair Display (headings) + Poppins (body) -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-<!-- Site styles -->
 <link rel="stylesheet" href="css/style.css" />
 
-<!-- Day 11 additions: brand tagline + About section + footer social icons -->
+<!-- ==========================================================================
+     DAY 12 additions (all injected here so css/style.css stays untouched)
+     ========================================================================== -->
 <style>
-  /* Brand tagline under the hero heading */
+  /* Brand tagline under the hero heading — filled by [data-content="tagline"] */
   .brand-tagline {
     font-family: "Playfair Display", Georgia, serif;
     font-style: italic;
@@ -37,16 +36,28 @@
     .brand-tagline { font-size: 14px; margin-bottom: 16px; padding: 0 8px; }
   }
 
-  /* About section — preserve line breaks from the admin story text */
-  #aboutText {
+  /* Multi-line text (textarea fields from site_content) */
+  #aboutText,
+  #heroText,
+  #footerText,
+  #contactAddressText {
     white-space: pre-line;
-    color: var(--muted, #6E6A63);
-    font-size: 14.5px;
-    line-height: 1.9;
-    margin: 0;
   }
 
-  /* Footer social icons — round gold buttons, hidden until a URL is set */
+  /* Footer tagline / blurb text */
+  #footerText {
+    font-size: 13px;
+    color: rgba(255,255,255,.58);
+    line-height: 1.7;
+    margin: 12px 0;
+    max-width: 340px;
+    text-align: left;
+  }
+  @media (max-width: 1023px) {
+    #footerText { max-width: 100%; }
+  }
+
+  /* Round gold social icons in the footer */
   .footer-social {
     display: flex;
     gap: 10px;
@@ -71,19 +82,21 @@
     border-color: var(--gold, #C9A24B);
     transform: translateY(-2px);
   }
-  .footer-social-link svg {
-    width: 18px;
-    height: 18px;
-    display: block;
-  }
+  .footer-social-link svg { width: 18px; height: 18px; display: block; }
   .footer-social-link[hidden] { display: none !important; }
+
+  /* Contact card: keep the address paragraph tidy */
+  #contactAddressText {
+    font-size: 14px;
+    color: var(--navy, #0B1F3A);
+    line-height: 1.55;
+  }
 </style>
 </head>
 <body>
 
 <!-- ==========================================================================
-     OFFER STRIP (thin announcement bar above the header).
-     Filled by js/script.js. Stays hidden and takes zero space when empty.
+     OFFER STRIP (announcement bar — hidden when empty)
      ========================================================================== -->
 <div id="offerStripRoot" class="offer-strip-root" aria-live="polite"></div>
 
@@ -93,13 +106,11 @@
 <header class="site-header" id="siteHeader">
   <div class="header-inner" id="headerInner">
 
-    <!-- Hamburger (visible on phone + tablet; hidden on laptop) -->
     <button class="hamburger" id="menuToggle" type="button"
             aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
       <span></span><span></span><span></span>
     </button>
 
-    <!-- Brand / logo -->
     <a class="brand" href="#top" aria-label="Viona Bangles home">
       <img src="images/logo-gold.png"
            alt="Viona Bangles"
@@ -109,7 +120,6 @@
       <span class="brand-fallback" id="headerLogoFallback" hidden>Viona</span>
     </a>
 
-    <!-- Search bar -->
     <div class="search-wrap" id="searchWrap">
       <form class="search-form" id="searchForm" role="search" autocomplete="off">
         <span class="search-icon" aria-hidden="true">
@@ -119,9 +129,11 @@
             <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
           </svg>
         </span>
+        <!-- Search placeholder is editable via site_content.search_placeholder -->
         <input type="text"
                id="searchInput"
                class="search-input"
+               data-content="search_placeholder"
                placeholder="Search bangles, categories…"
                aria-label="Search bangles"
                aria-autocomplete="list"
@@ -137,7 +149,6 @@
       <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
     </div>
 
-    <!-- Account / Login area -->
     <div class="account-wrap" id="accountWrap">
       <button type="button" class="login-btn" id="loginBtn">Login</button>
 
@@ -154,13 +165,12 @@
       </div>
     </div>
 
-    <!-- Navigation (LAPTOP ONLY) -->
     <nav class="header-nav" id="headerNav" aria-label="Main navigation">
-      <a href="#top" class="nav-link">Home</a>
-      <a href="#collections" class="nav-link">Collections</a>
-      <a href="#about" class="nav-link">About Us</a>
-      <a href="#contact" class="nav-link">Contact Us</a>
-      <a href="#faq" class="nav-link">FAQ</a>
+      <a href="#top"         class="nav-link" data-content="nav_home">Home</a>
+      <a href="#collections" class="nav-link" data-content="nav_collections">Collections</a>
+      <a href="#about"       class="nav-link" data-content="nav_about">About Us</a>
+      <a href="#contact"     class="nav-link" data-content="nav_contact">Contact Us</a>
+      <a href="#faq"         class="nav-link" data-content="nav_faq">FAQ</a>
       <a class="nav-wa" id="headerWhatsApp"
          href="https://wa.me/916200920746" target="_blank" rel="noopener"
          aria-label="Chat on WhatsApp">
@@ -172,7 +182,6 @@
 
   </div>
 
-  <!-- Category strip (built by JS) -->
   <div class="category-strip" id="categoryStrip" hidden>
     <div class="category-strip-inner" id="categoryStripInner" role="tablist"
          aria-label="Product categories"></div>
@@ -180,7 +189,7 @@
 </header>
 
 <!-- ==========================================================================
-     MOBILE DRAWER (phone + tablet, up to 1023px)
+     MOBILE DRAWER
      ========================================================================== -->
 <div class="menu-overlay" id="menuOverlay" hidden></div>
 
@@ -196,11 +205,11 @@
   <div class="mobile-menu-brand">Viona Bangles</div>
 
   <nav class="mobile-menu-nav" aria-label="Mobile navigation">
-    <a href="#top"         class="mobile-menu-link" data-menu-link>Home</a>
-    <a href="#collections" class="mobile-menu-link" data-menu-link>Collections</a>
-    <a href="#about"       class="mobile-menu-link" data-menu-link>About Us</a>
-    <a href="#contact"     class="mobile-menu-link" data-menu-link>Contact Us</a>
-    <a href="#faq"         class="mobile-menu-link" data-menu-link>FAQ</a>
+    <a href="#top"         class="mobile-menu-link" data-menu-link data-content="nav_home">Home</a>
+    <a href="#collections" class="mobile-menu-link" data-menu-link data-content="nav_collections">Collections</a>
+    <a href="#about"       class="mobile-menu-link" data-menu-link data-content="nav_about">About Us</a>
+    <a href="#contact"     class="mobile-menu-link" data-menu-link data-content="nav_contact">Contact Us</a>
+    <a href="#faq"         class="mobile-menu-link" data-menu-link data-content="nav_faq">FAQ</a>
   </nav>
 
   <a class="mobile-menu-wa" id="mobileMenuWhatsApp"
@@ -241,18 +250,20 @@
       <span class="brand-fallback hero-fallback" id="heroLogoFallback" hidden>Viona</span>
 
       <p class="hero-label" id="heroLabel">Handcrafted in Gaya, Bihar</p>
-      <h1 class="hero-heading" id="heroHeading">Timeless Bangles, Made for You</h1>
 
-      <!-- Brand tagline — filled from brand_settings by js/brand.js.
-           Default text stays if fetch fails so nothing looks broken. -->
-      <p class="brand-tagline" id="brandTagline">Where tradition meets timeless elegance — handcrafted, premium, and made for you.</p>
+      <!-- Editable title from site_content.hero_title -->
+      <h1 class="hero-heading" id="heroHeading" data-content="hero_title">Timeless Bangles, Made for You</h1>
 
-      <p class="hero-text" id="heroText">
-        Premium glass and traditional bangles, handpicked for every occasion.
+      <!-- Editable tagline from site_content.tagline -->
+      <p class="brand-tagline" id="brandTagline" data-content="tagline">Where tradition meets timeless elegance — handcrafted, premium, and made for you.</p>
+
+      <!-- Editable subtitle from site_content.hero_subtitle (textarea) -->
+      <p class="hero-text" id="heroText" data-content="hero_subtitle">
+        Premium handcrafted glass and traditional bangles, handpicked for every occasion.
       </p>
 
       <div class="hero-actions">
-        <a href="#collections" class="btn btn-gold">Shop Collections</a>
+        <a href="#collections" class="btn btn-gold" data-content="hero_button">Shop Collections</a>
         <a href="https://wa.me/916200920746" id="heroWhatsApp" class="btn btn-outline"
            target="_blank" rel="noopener">WhatsApp Us</a>
       </div>
@@ -261,7 +272,7 @@
   </section>
 
   <!-- ========================================================================
-       TRUST POINTS (hidden when empty)
+       TRUST POINTS (hidden when empty — filled by js/script.js)
        ======================================================================== -->
   <section class="trust" id="trustSection" hidden>
     <div class="container">
@@ -276,8 +287,8 @@
     <div class="container">
 
       <header class="section-head">
-        <p class="section-label">Our Collection</p>
-        <h2 class="section-title">Handpicked Bangles</h2>
+        <p class="section-label" data-content="collections_subtitle">Our Collection</p>
+        <h2 class="section-title" data-content="collections_title">Handpicked Bangles</h2>
         <div class="gold-rule" aria-hidden="true"></div>
       </header>
 
@@ -303,7 +314,7 @@
   </section>
 
   <!-- ========================================================================
-       ABOUT — brand story pulled from public.brand_settings (by js/brand.js)
+       ABOUT — brand story (site_content.about_title / about_text)
        ======================================================================== -->
   <section class="about" id="about">
     <div class="container about-inner">
@@ -321,9 +332,9 @@
 
       <div class="about-text">
         <p class="section-label">Our Story</p>
-        <h2 class="section-title" id="aboutTitle">The Viona Story</h2>
+        <h2 class="section-title" id="aboutHeading" data-content="about_title">The Viona Story</h2>
         <div class="gold-rule" aria-hidden="true"></div>
-        <p class="about-paragraph" id="aboutText">Viona Bangles is a small family workshop in Gaya, Bihar. Every bangle is finished by hand and checked with care before it is packed for you.</p>
+        <p class="about-paragraph" id="aboutText" data-content="about_text">Viona Bangles is a small family workshop in Gaya, Bihar. Every bangle is finished by hand and checked with care before it is packed for you.</p>
         <ul class="about-points" id="aboutPoints"></ul>
       </div>
 
@@ -345,13 +356,13 @@
   </section>
 
   <!-- ========================================================================
-       CONTACT
+       CONTACT — all key fields editable from site_content
        ======================================================================== -->
   <section class="contact" id="contact">
     <div class="container">
       <header class="section-head">
         <p class="section-label">Get in touch</p>
-        <h2 class="section-title">Visit or Message Us</h2>
+        <h2 class="section-title" data-content="contact_title">Visit or Message Us</h2>
         <div class="gold-rule" aria-hidden="true"></div>
       </header>
 
@@ -362,19 +373,23 @@
           <ul class="contact-list">
             <li>
               <span class="contact-label">Workshop</span>
-              <span id="contactCity">Gaya, Bihar</span>
+              <span id="contactCityText" data-content="contact_city">Gaya, Bihar</span>
             </li>
             <li>
-              <span class="contact-label">Open Hours</span>
-              <span id="contactHours">10:00 AM - 7:00 PM</span>
+              <span class="contact-label">Address</span>
+              <span id="contactAddressText" data-content="contact_address">Gaya, Bihar, India</span>
+            </li>
+            <li>
+              <span class="contact-label">Working Hours</span>
+              <span id="contactHoursText" data-content="working_hours">Mon - Sun: 10:00 AM - 7:00 PM</span>
+            </li>
+            <li>
+              <span class="contact-label">Phone</span>
+              <span id="contactPhoneText" data-content="contact_phone">+91 62009 20746</span>
             </li>
             <li>
               <span class="contact-label">Email</span>
               <a id="contactEmail" href="mailto:vionabangles@gmail.com">vionabangles@gmail.com</a>
-            </li>
-            <li>
-              <span class="contact-label">WhatsApp</span>
-              <a id="contactPhone" href="https://wa.me/916200920746" target="_blank" rel="noopener">+91 62009 20746</a>
             </li>
           </ul>
           <a class="btn btn-gold btn-block" id="contactWhatsApp"
@@ -414,10 +429,13 @@
       <p class="footer-tagline">ELEGANT BANGLES</p>
       <p class="footer-sub">Made for You</p>
 
-      <!-- Footer social icons — set by js/brand.js. Hidden when the URL is empty. -->
+      <!-- Editable footer blurb (site_content.footer_text) -->
+      <p class="footer-text" id="footerText" data-content="footer_text">Elegant bangles, handcrafted with love in Gaya, Bihar. Each piece is checked by hand before it reaches you.</p>
+
+      <!-- Social links — hidden until a URL exists in site_content -->
       <div class="footer-social" id="footerSocial">
         <a class="footer-social-link" id="igLink" href="#" target="_blank" rel="noopener"
-           aria-label="Instagram" hidden>
+           aria-label="Instagram" data-content-href="instagram_url" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect>
@@ -426,7 +444,7 @@
           </svg>
         </a>
         <a class="footer-social-link" id="fbLink" href="#" target="_blank" rel="noopener"
-           aria-label="Facebook" hidden>
+           aria-label="Facebook" data-content-href="facebook_url" hidden>
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 4v2.2H8v3h2.5V21h3z"/>
           </svg>
@@ -436,16 +454,16 @@
 
     <div class="footer-col">
       <h4 class="footer-heading">Explore</h4>
-      <a href="#collections" class="footer-link">Collections</a>
-      <a href="#about" class="footer-link">About Us</a>
-      <a href="#faq" class="footer-link">FAQ</a>
-      <a href="#contact" class="footer-link">Contact</a>
+      <a href="#collections" class="footer-link" data-content="nav_collections">Collections</a>
+      <a href="#about" class="footer-link" data-content="nav_about">About Us</a>
+      <a href="#faq" class="footer-link" data-content="nav_faq">FAQ</a>
+      <a href="#contact" class="footer-link" data-content="nav_contact">Contact</a>
     </div>
 
     <div class="footer-col">
       <h4 class="footer-heading">Reach Us</h4>
-      <p class="footer-line" id="footerCity">Gaya, Bihar</p>
-      <p class="footer-line" id="footerHours">10:00 AM - 7:00 PM</p>
+      <p class="footer-line" id="footerCityText" data-content="contact_city">Gaya, Bihar</p>
+      <p class="footer-line" id="footerHoursText" data-content="working_hours">Mon - Sun: 10:00 AM - 7:00 PM</p>
       <a class="footer-link" id="footerEmail" href="mailto:vionabangles@gmail.com">vionabangles@gmail.com</a>
       <a class="footer-link" id="footerWhatsApp" href="https://wa.me/916200920746" target="_blank" rel="noopener">WhatsApp</a>
     </div>
@@ -459,7 +477,7 @@
 
   <div class="footer-bottom">
     <div class="container">
-      <p>© <span id="footerYear">2026</span> Viona Bangles. All rights reserved.</p>
+      <p><span data-content="footer_copyright">© 2026 Viona Bangles. All rights reserved.</span></p>
     </div>
   </div>
 </footer>
@@ -516,7 +534,7 @@
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="btn-wa-icon">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
             </svg>
-            Order on WhatsApp
+            <span data-content="order_button_text">Order on WhatsApp</span>
           </a>
         </div>
 
@@ -526,7 +544,7 @@
                   data-tab="details">Details</button>
           <button class="tab-btn" id="tabBtnReviews" type="button"
                   role="tab" aria-selected="false" aria-controls="tabReviews"
-                  data-tab="reviews">Reviews <span class="tab-count" id="tabReviewCount"></span></button>
+                  data-tab="reviews"><span data-content="reviews_title">Reviews</span> <span class="tab-count" id="tabReviewCount"></span></button>
         </div>
 
         <div class="tab-panel" id="tabDetails" role="tabpanel"
@@ -578,7 +596,7 @@
 </div>
 
 <!-- ==========================================================================
-     LIGHTBOX (review photo viewer)
+     LIGHTBOX
      ========================================================================== -->
 <div class="lightbox" id="lightbox" hidden>
   <div class="lightbox-backdrop" data-lb-close></div>
@@ -594,25 +612,20 @@
 </div>
 
 <!-- ==========================================================================
-     POPUP MESSAGE ROOT (filled by JS only when an active popup exists)
+     POPUP ROOT + TOAST
      ========================================================================== -->
 <div id="popupRoot" class="popup-root"></div>
-
-<!-- ==========================================================================
-     TOAST
-     ========================================================================== -->
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- ==========================================================================
-     SCRIPTS
-     Order matters: supabase CDN -> config -> auth (builds its own modals) ->
-     script (products/reviews) -> brand (About / tagline / social).
+     SCRIPTS — order: config → auth → brand → script
+     (brand.js BEFORE script.js so site_content is loaded first)
      ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
-<script src="js/script.js"></script>
 <script src="js/brand.js"></script>
+<script src="js/script.js"></script>
 
 </body>
 </html>
