@@ -6,52 +6,44 @@
    Uses:
      - window.VIONA_CONFIG  (js/config.js)
      - window.VionaAuth     (js/auth.js)  -> auth + login modal + profile
-     - window.siteText / window.SITE_CONTENT (js/brand.js, Day 12)
+     - window.siteText / window.SITE_CONTENT (js/brand.js)
      - supabase-js v2       (CDN global "supabase")
 
    What it does:
-     - Loads products + site_settings from Supabase (defensive: learns columns
-       by doing select * limit 1). No demo data anywhere.
+     - Products from Supabase. No demo data.
      - Header search + suggestions, category strip, product grid.
      - Product modal with gallery, size chips, WhatsApp order button.
      - Offers banner from site_settings (hidden when empty).
-     - Reviews: fetched once, grouped by product_id, shown per product.
+     - Reviews per product with star breakdown.
      - Review form wired to VionaAuth (login required).
-     - Mobile slide-in drawer (#mobileMenu).
-     - Injects its own CSS so css/style.css does not need to change.
+     - Mobile drawer, injected CSS.
 
-   DAY 12 (TASK 2) — Product sizes on the details view:
-     - Master list comes from site_content.all_sizes (fallback "2.2, 2.4, 2.6, 2.8").
-     - A size is AVAILABLE if it's inside the product's `sizes` column
-       (parsed from array or text with commas / slashes / spaces, compared
-       numerically so "2.4" === "2.40"). Available chips are normal and
-       selectable — the selected size still flows into the WhatsApp order
-       message exactly as before.
-     - Sizes NOT in the product's sizes are UNAVAILABLE: dimmed grey, no
-       hover, cursor not-allowed. Clicking one opens a premium navy + gold
-       popup with size_unavailable_title / size_unavailable_message
-       (prefixed with "Size X") / size_unavailable_button. It never selects
-       the size.
-     - If a product has no sizes value at all → the size section is hidden.
-     - If the product is out_of_stock → all chips are disabled (existing
-       behaviour), no popup is shown when clicking them.
+   DAY 12 (TASK 2) — Sizes (Amazon-style):
+     - ONE constant ALL_SIZES at the top — edit that to change the master list.
+     - The product modal shows ALL sizes from ALL_SIZES, plus any extra size
+       the product has that is not in ALL_SIZES.
+     - Available sizes come from the product's "sizes" column (array or text
+       with commas / slashes / spaces, compared numerically so "2.4" = "2.40").
+     - Unavailable sizes are greyed with a diagonal cross line (like Amazon).
+       Clicking one opens a premium navy+gold popup. Never selects the size.
+     - Product with empty "sizes" → size section is hidden entirely.
+     - Out-of-stock product → all chips disabled (existing behaviour); no popup.
 
-   DAY 12 — editable strings:
-     - Empty products message, order button label, size popup title/message/
-       button, and any other string the script generates now reads
-       window.siteText('key', 'fallback').
-     - Re-renders those strings when the "siteContentLoaded" event fires
-       (so brand.js loading late doesn't leave stale text in the UI).
+   Strings that this script generates (empty-products message, order button
+   label, size-unavailable popup title/message/button) read window.siteText
+   with a hardcoded fallback. Re-rendered on "siteContentLoaded".
 
    Earlier fixes retained:
-     - C1: offer flag read from offer_active OR offer_enabled.
+     - C1: offer flag from offer_active OR offer_enabled.
      - C2: sizes parsed JSON → array → CSV.
      - M2: offer_link used for "Shop now", hidden if empty.
      - M4: sizes default only when null/undefined.
-     - Review bars: count from the currently-open product's reviews only,
-       readRatingValue() handles rating/stars, no bars when total = 0,
-       bars re-render on product switch and after submit.
+     - Review bars: only from current product's reviews; safe when total = 0.
    ============================================================================ */
+
+/* ⬇⬇⬇ Master list of bangle sizes shown on every product.
+        Change this list to add or remove sizes for the whole website. ⬇⬇⬇ */
+const ALL_SIZES = ['2.2', '2.4', '2.6', '2.8'];
 
 (function () {
   'use strict';
@@ -196,7 +188,6 @@
     console.error('[viona] ' + where, err);
   }
 
-  /* Read a rating from a review row — supports r.rating or r.stars. */
   function readRatingValue(r) {
     if (!r) return 0;
     var raw = r.rating;
@@ -213,8 +204,7 @@
      3. SIZE HELPERS (Day 12 TASK 2)
      ========================================================================== */
 
-  /* Parse a sizes value into an array of trimmed strings.
-     Handles arrays, CSV, slashes and whitespace: "2.4, 2.6" / "2.4/2.6" / ["2.4","2.6"]. */
+  /* Split any raw sizes value into an array of trimmed strings. */
   function parseSizeList(raw) {
     if (raw == null) return [];
     if (Array.isArray(raw)) {
@@ -225,44 +215,33 @@
     return str.split(/[,\/\s]+/).map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
-  /* Normalised numeric key so "2.4" === "2.40" === "2.40" (case-folded for word sizes). */
+  /* Numeric key so "2.4" === "2.40" === "2.4" (case-folded for word sizes). */
   function sizeKey(s) {
     var n = parseFloat(s);
     if (isFinite(n)) return 'n:' + n.toFixed(3);
     return 's:' + String(s).trim().toLowerCase();
   }
 
-  /* Master list from site_content.all_sizes (falls back to a sensible default). */
-  function getMasterSizes() {
-    var raw = t('all_sizes', '2.2, 2.4, 2.6, 2.8');
-    var list = parseSizeList(raw);
-    if (!list.length) list = ['2.2', '2.4', '2.6', '2.8'];
-    return list;
-  }
-
-  /* The sizes a specific product has (numeric-key comparison later). */
+  /* Product's own available sizes (already parsed from text/array). */
   function getProductSizeValues(p) {
     if (!p) return [];
     return parseSizeList(p.sizes);
   }
 
-  /* Build the full ordered list of chips for a product:
+  /* Build the ordered chips for a product:
        { label, available }
-     - Available sizes come from the product's `sizes` field.
-     - Master sizes that aren't in the product are UNAVAILABLE.
-     - Extra product sizes not in the master are appended (always available). */
+     - ALL_SIZES first (available or not), then extras from product. */
   function buildSizeChips(p) {
     var productRaw = getProductSizeValues(p);
-    if (!productRaw.length) return null;   // no sizes → hide section
+    if (!productRaw.length) return null;
 
     var availableSet = {};
     productRaw.forEach(function (s) { availableSet[sizeKey(s)] = String(s); });
 
-    var master = getMasterSizes();
     var seen = {};
     var out = [];
 
-    master.forEach(function (s) {
+    ALL_SIZES.forEach(function (s) {
       var k = sizeKey(s);
       if (seen[k]) return;
       seen[k] = true;
@@ -366,7 +345,7 @@
       'transition:width .55s cubic-bezier(.2,.7,.2,1);}',
       '.vrt-bar-count{text-align:right;color:#6B7280;font-variant-numeric:tabular-nums;}',
 
-      /* reviews list */
+      /* reviews */
       '.vrt-rv{padding:16px 0;border-bottom:1px solid #ECE6DA;}',
       '.vrt-rv:last-child{border-bottom:none;}',
       '.vrt-rv-top{display:flex;align-items:center;gap:12px;margin-bottom:8px;}',
@@ -395,7 +374,6 @@
       '.vrt-rv-act.danger{color:#B42318;border-color:#F2C6C2;}',
       '.vrt-rv-act.danger:hover{background:#FDF2F1;}',
 
-      /* review form */
       '.vrt-form{background:#fff;border:1px solid #ECE6DA;border-radius:14px;',
       'padding:18px 20px;margin-top:16px;}',
       '.vrt-form-title{font-size:16px;font-weight:700;margin:0 0 4px;color:#0B1F3A;}',
@@ -474,43 +452,82 @@
       'font-size:13px;font-weight:600;color:#0B1F3A;',
       'text-decoration:underline;text-underline-offset:3px;}',
       '.modal-restock-link:hover{color:#C9A24B;}',
-      '.size-chip.is-disabled,.size-chip[disabled]{opacity:.45;',
-      'cursor:not-allowed;pointer-events:none;}',
 
-      /* DAY 12 — dimmed "size not available" chips.
-         Clickable so they can open the popup; looks dim, no hover lift. */
-      '.size-chip.is-unavailable{opacity:.45;background:#EFEAE0;',
-      'color:#8A8F98;border-color:#E4DED2;cursor:not-allowed;}',
-      '.size-chip.is-unavailable:hover{border-color:#E4DED2;',
-      'background:#EFEAE0;color:#8A8F98;}',
-      '.size-chip.is-unavailable.is-active{background:#EFEAE0;',
-      'color:#8A8F98;border-color:#E4DED2;}',
+      /* ---------------------------------------------------------------------
+         DAY 12 — Amazon-style unavailable size chips.
+         Dimmed text, light dashed border, and a diagonal cross line.
+         The cross uses ::after with a linear-gradient so it works on any
+         button size and stays crisp on phone.
+         --------------------------------------------------------------------- */
+      '.size-chip{position:relative;overflow:hidden;}',
 
-      /* SIZE POPUP — navy + gold, centered */
+      '.size-chip.is-unavailable{',
+        'background:#F7F4EC;',
+        'color:#A7ABB3;',
+        'border:1px dashed #D9D3C4;',
+        'cursor:not-allowed;',
+        'font-weight:500;',
+        'text-decoration:none;',
+      '}',
+      '.size-chip.is-unavailable:hover{',
+        'background:#F7F4EC;',
+        'color:#A7ABB3;',
+        'border-color:#D9D3C4;',
+        'transform:none;',
+        'box-shadow:none;',
+      '}',
+      /* Diagonal cross line (bottom-left to top-right) */
+      '.size-chip.is-unavailable::after{',
+        'content:"";',
+        'position:absolute;',
+        'left:-2px; right:-2px; top:50%;',
+        'height:1.4px;',
+        'background:#B7A98C;',
+        'transform:rotate(-33deg);',
+        'transform-origin:center;',
+        'pointer-events:none;',
+        'opacity:.85;',
+      '}',
+      '.size-chip.is-unavailable > *{ position:relative; z-index:1; }',
+      '.size-chip.is-unavailable.is-active{',
+        'background:#F7F4EC;',
+        'color:#A7ABB3;',
+        'border-color:#D9D3C4;',
+      '}',
+
+      /* Out-of-stock product: disabled chips (existing behaviour, no cross) */
+      '.size-chip.is-disabled,.size-chip[disabled]{',
+        'opacity:.45;cursor:not-allowed;pointer-events:none;',
+      '}',
+
+      /* ---------------------------------------------------------------------
+         Size-unavailable POPUP — navy + gold, centered.
+         Injected HTML lives in #popupRoot.
+         --------------------------------------------------------------------- */
       '#sizePopup.popup-overlay{position:fixed;inset:0;z-index:1100;',
-      'display:grid;place-items:center;padding:20px;}',
+        'display:grid;place-items:center;padding:20px;}',
       '#sizePopup .popup-backdrop{position:absolute;inset:0;',
-      'background:rgba(5,10,20,.78);backdrop-filter:blur(3px);',
-      '-webkit-backdrop-filter:blur(3px);animation:fadeIn .2s ease;}',
+        'background:rgba(5,10,20,.78);backdrop-filter:blur(3px);',
+        '-webkit-backdrop-filter:blur(3px);animation:fadeIn .2s ease;}',
       '#sizePopup .size-popup-card{position:relative;z-index:2;',
-      'width:100%;max-width:400px;border-radius:18px;overflow:hidden;',
-      'background:linear-gradient(180deg,#0B1F3A 0%,#081428 100%);',
-      'border-top:3px solid #C9A24B;color:#fff;',
-      'box-shadow:0 24px 60px rgba(0,0,0,.5);',
-      'animation:popIn .25s ease;}',
+        'width:100%;max-width:400px;border-radius:18px;overflow:hidden;',
+        'background:linear-gradient(180deg,#0B1F3A 0%,#081428 100%);',
+        'border-top:3px solid #C9A24B;color:#fff;',
+        'box-shadow:0 24px 60px rgba(0,0,0,.5);',
+        'animation:popIn .25s ease;}',
       '#sizePopup .popup-inner{padding:32px 26px 26px;text-align:center;}',
       '#sizePopup .popup-title{color:#E3C87F;',
-      'font-family:"Playfair Display",Georgia,serif;',
-      'font-size:22px;font-weight:600;margin:0 0 10px;line-height:1.3;}',
+        'font-family:"Playfair Display",Georgia,serif;',
+        'font-size:22px;font-weight:600;margin:0 0 10px;line-height:1.3;}',
       '#sizePopup .popup-subtitle{color:rgba(255,255,255,.86);',
-      'white-space:pre-line;font-size:14px;line-height:1.6;margin:0 0 22px;}',
+        'white-space:pre-line;font-size:14px;line-height:1.6;margin:0 0 22px;}',
       '#sizePopup .popup-btn{display:inline-block;padding:11px 28px;',
-      'border-radius:999px;border:0;',
-      'background:linear-gradient(180deg,#D4AF63 0%,#C9A24B 100%);',
-      'color:#0B1F3A;font-family:inherit;font-size:13px;font-weight:600;',
-      'letter-spacing:.08em;text-transform:uppercase;cursor:pointer;',
-      'box-shadow:0 8px 22px rgba(201,162,75,.4);',
-      'transition:filter .15s ease,transform .15s ease;}',
+        'border-radius:999px;border:0;',
+        'background:linear-gradient(180deg,#D4AF63 0%,#C9A24B 100%);',
+        'color:#0B1F3A;font-family:inherit;font-size:13px;font-weight:600;',
+        'letter-spacing:.08em;text-transform:uppercase;cursor:pointer;',
+        'box-shadow:0 8px 22px rgba(201,162,75,.4);',
+        'transition:filter .15s ease,transform .15s ease;}',
       '#sizePopup .popup-btn:hover{filter:brightness(1.06);}',
       '#sizePopup .popup-btn:active{transform:translateY(1px);}',
 
@@ -529,7 +546,7 @@
   }
 
   /* ==========================================================================
-     6. LOAD SITE SETTINGS
+     6. LOAD SITE SETTINGS (unchanged Day 11/12 logic)
      ========================================================================== */
 
   async function loadSettings() {
@@ -634,61 +651,24 @@
   function applySettings() {
     var s = state.settings || {};
     var b = s.business || {};
-    var h = s.hero || {};
-    var a = s.about || {};
-    var t2 = s.trust || {};
-    var soc = s.social || {};
 
     var waNum = b.whatsapp || CFG.WHATSAPP_NUMBER || '';
     var waMsg = 'Hello Viona Bangles, I would like to know more about your bangles.';
 
-    /* Only fill hero/about fields if the site_content has not provided a
-       value — otherwise we would overwrite the editable data from brand.js. */
     function setIfEmpty(id, value) {
       var node = el(id);
       if (!node) return;
-      if (node.getAttribute('data-content')) return; // brand.js handles it
+      if (node.getAttribute('data-content')) return;
       if (!node.textContent || !node.textContent.trim()) {
         if (value) node.textContent = value;
       }
     }
 
-    setIfEmpty('heroLabel', h.label);
-    setIfEmpty('heroHeading', h.heading);
-    setIfEmpty('heroText', h.text);
-
-    setIfEmpty('aboutHeading', a.heading);
-    setIfEmpty('aboutText', a.text);
-
-    var aboutPoints = el('aboutPoints');
-    if (aboutPoints && !aboutPoints.getAttribute('data-content')) {
-      var pts = Array.isArray(t2.points) ? t2.points : [];
-      var pptHtml = '';
-      pts.forEach(function (p) { if (p) pptHtml += '<li>' + esc(p) + '</li>'; });
-      aboutPoints.innerHTML = pptHtml;
-    }
-
-    var trustSection = el('trustSection');
-    var trustList = el('trustList');
-    if (trustSection && trustList) {
-      var trustPts = Array.isArray(t2.points) ? t2.points : [];
-      var trustHtml = '';
-      trustPts.forEach(function (p) {
-        if (!p) return;
-        trustHtml += '<li class="trust-item"><span class="trust-mark" aria-hidden="true">✦</span>' + esc(p) + '</li>';
-      });
-      if (trustHtml) {
-        trustList.innerHTML = trustHtml;
-        trustSection.hidden = false;
-      } else {
-        trustSection.hidden = true;
-      }
-    }
-
-    var cCity  = el('contactCity');
-    if (cCity && !cCity.getAttribute('data-content')) cCity.textContent = b.city || CFG.CITY || '';
-    var cHours = el('contactHours');
-    if (cHours && !cHours.getAttribute('data-content')) cHours.textContent = b.hours || CFG.HOURS || '';
+    setIfEmpty('heroLabel', (s.hero || {}).label);
+    setIfEmpty('heroHeading', (s.hero || {}).heading);
+    setIfEmpty('heroText', (s.hero || {}).text);
+    setIfEmpty('aboutHeading', (s.about || {}).heading);
+    setIfEmpty('aboutText', (s.about || {}).text);
 
     var cEmail = el('contactEmail');
     if (cEmail) {
@@ -696,17 +676,6 @@
       cEmail.textContent = email;
       cEmail.href = email ? ('mailto:' + email) : '#';
     }
-
-    var cPhone = el('contactPhone');
-    if (cPhone && !cPhone.getAttribute('data-content')) {
-      cPhone.textContent = '+' + String(waNum).replace(/^\+/, '');
-      cPhone.href = waLink(waNum, waMsg);
-    }
-
-    var fCity = el('footerCity');
-    if (fCity && !fCity.getAttribute('data-content')) fCity.textContent = b.city || CFG.CITY || '';
-    var fHours = el('footerHours');
-    if (fHours && !fHours.getAttribute('data-content')) fHours.textContent = b.hours || CFG.HOURS || '';
 
     var fEmail = el('footerEmail');
     if (fEmail) {
@@ -720,15 +689,6 @@
     var heroWa = el('heroWhatsApp'); if (heroWa) heroWa.href = waLink(waNum, waMsg);
     var cWa = el('contactWhatsApp'); if (cWa) cWa.href = waLink(waNum, waMsg);
     var mWa = el('mobileMenuWhatsApp'); if (mWa) mWa.href = waLink(waNum, waMsg);
-
-    var socialWrap = el('contactSocial');
-    if (socialWrap) {
-      var socialHtml = '';
-      if (soc.instagram) socialHtml += '<a class="social-link" href="' + escAttr(soc.instagram) + '" target="_blank" rel="noopener">Instagram</a>';
-      if (soc.facebook)  socialHtml += '<a class="social-link" href="' + escAttr(soc.facebook)  + '" target="_blank" rel="noopener">Facebook</a>';
-      if (soc.youtube)   socialHtml += '<a class="social-link" href="' + escAttr(soc.youtube)   + '" target="_blank" rel="noopener">YouTube</a>';
-      socialWrap.innerHTML = socialHtml;
-    }
 
     var y = el('footerYear');
     if (y && !y.parentNode.getAttribute('data-content')) y.textContent = String(new Date().getFullYear());
@@ -856,7 +816,7 @@
     if (isNaN(oldPrice) || oldPrice <= 0) oldPrice = null;
     if (oldPrice != null && !(oldPrice > price)) oldPrice = null;
 
-    /* Sizes — JSON first, then array, then CSV. Default only when null. */
+    /* Sizes — JSON first, then array, then CSV. */
     var sizesRaw = (R.sizes && row[R.sizes] != null) ? row[R.sizes] : row.sizes;
     var sizes;
     if (sizesRaw === null || sizesRaw === undefined) {
@@ -968,7 +928,7 @@
   }
 
   /* ==========================================================================
-     9. REVIEWS — fetch once, group by product_id
+     9. REVIEWS
      ========================================================================== */
 
   function reviewStatsFor(productId) {
@@ -1119,7 +1079,7 @@
           setEmptyState('Could not load products.', 'Please refresh the page.', false);
         } else if (!hasProducts) {
           var emptyMsg = t('empty_products_message',
-            'No products available right now. Please check back soon.');
+            'New bangles are being added right now. Please check back soon, or message us on WhatsApp for our full catalogue.');
           setEmptyState('Nothing to show yet', emptyMsg, false);
         } else {
           setEmptyState('No products found.', 'Try another category or search.', true);
@@ -1211,7 +1171,7 @@
   }
 
   /* ==========================================================================
-     11. SEARCH + LIVE SUGGESTIONS
+     11. SEARCH + SUGGESTIONS
      ========================================================================== */
 
   function setupSearch() {
@@ -1552,12 +1512,9 @@
   }
 
   /* --------------------------------------------------------------------------
-     renderSizes — DAY 12 TASK 2
-     Builds chips from master list (site_content.all_sizes) + product sizes.
-     Available sizes are selectable and flow into the WhatsApp message.
-     Unavailable sizes are dimmed; clicking one opens the premium popup.
-     Product with NO sizes → section hidden.
-     Product out_of_stock → all chips disabled, no popup on click.
+     renderSizes — Day 12 TASK 2
+     ALL_SIZES + product extras. Available = selectable, unavailable = crossed.
+     Clicking unavailable opens the popup (does NOT select the size).
      -------------------------------------------------------------------------- */
   function renderSizes(p) {
     var wrap = el('modalSizes');
@@ -1581,12 +1538,12 @@
 
     var html = '';
     chips.forEach(function (item) {
-      var clickable = item.available && !outOfStock;
       var sizeAvailable = !!item.available;
+      var clickable = sizeAvailable && !outOfStock;
       var dimmed = !sizeAvailable || outOfStock;
 
       var cls = 'size-chip';
-      if (dimmed) cls += ' is-unavailable';
+      if (!sizeAvailable) cls += ' is-unavailable';   // crossed Amazon style
       if (outOfStock) cls += ' is-disabled';
 
       html += '<button type="button" class="' + cls + '"' +
@@ -1617,7 +1574,7 @@
         } else if (!sizeAvail && !outOfStock) {
           openSizeUnavailablePopup(sizeLabel);
         }
-        // out_of_stock: do nothing (button is disabled)
+        // out_of_stock: button is disabled; do nothing.
       });
     });
 
@@ -1636,8 +1593,7 @@
   }
 
   /* --------------------------------------------------------------------------
-     SIZE UNAVAILABLE POPUP — navy + gold, centered.
-     Closes with button, outside click or Esc.
+     Size-unavailable popup — navy + gold, centered. Closes on OK / outside / Esc.
      -------------------------------------------------------------------------- */
   function openSizeUnavailablePopup(sizeLabel) {
     var root = el('popupRoot');
@@ -1645,10 +1601,17 @@
 
     var title   = t('size_unavailable_title', 'Currently unavailable');
     var message = t('size_unavailable_message',
-      'This size is not available right now. Please choose another size or message us on WhatsApp.');
+      'Size ' + sizeLabel + ' is not available right now. Please choose another size or message us on WhatsApp.');
     var btnLbl  = t('size_unavailable_button', 'OK');
 
-    var fullMessage = 'Size ' + sizeLabel + ' — ' + message;
+    // Some rows may use a placeholder token (X) in the message; support both.
+    if (message.indexOf('{size}') !== -1) {
+      message = message.replace(/\{size\}/g, sizeLabel);
+    } else if (message.indexOf('Size X') !== -1) {
+      message = message.replace(/Size X/g, 'Size ' + sizeLabel);
+    } else if (message.indexOf(sizeLabel) === -1) {
+      message = 'Size ' + sizeLabel + ' — ' + message;
+    }
 
     root.innerHTML =
       '<div class="popup-overlay" id="sizePopup" role="dialog" aria-modal="true" ' +
@@ -1657,7 +1620,7 @@
         '<div class="size-popup-card" role="document">' +
           '<div class="popup-inner">' +
             '<h3 class="popup-title" id="sizePopupTitle">' + esc(title) + '</h3>' +
-            '<p class="popup-subtitle">' + esc(fullMessage) + '</p>' +
+            '<p class="popup-subtitle" data-size="' + escAttr(sizeLabel) + '">' + esc(message) + '</p>' +
             '<button type="button" class="popup-btn" data-popup-close>' + esc(btnLbl) + '</button>' +
           '</div>' +
         '</div>' +
@@ -1689,7 +1652,6 @@
     if (!root) return;
     root.innerHTML = '';
     root.hidden = true;
-    // Only remove body scroll lock if the product modal isn't also open.
     if (!state.currentProduct) {
       document.body.classList.remove('no-scroll');
     }
@@ -1842,8 +1804,7 @@
       if (e.key !== 'Escape') return;
       var lb = el('lightbox');
       if (lb && !lb.hidden) { closeLightbox(); return; }
-      // If the size popup is open, let its own handler deal with Esc.
-      if (el('sizePopup')) return;
+      if (el('sizePopup')) return;   // popup handles its own Esc
       if (document.querySelector('.va-backdrop:not([hidden])')) return;
       if (!modal.hidden) closeProductModal();
     });
@@ -2854,15 +2815,15 @@
   }
 
   /* ==========================================================================
-     22. RE-RENDER DYNAMIC STRINGS when site_content changes
+     22. RE-RENDER DYNAMIC STRINGS on siteContentLoaded
      ========================================================================== */
 
   function refreshDynamicStrings() {
-    // 1) Empty-products message — only if the empty state is visible now.
+    // 1) Empty-products message — only if the empty state is currently shown.
     var emptyBox = el('emptyBox');
     if (emptyBox && !emptyBox.hidden && !state.products.length && !state.loadError) {
       var msg = t('empty_products_message',
-        'No products available right now. Please check back soon.');
+        'New bangles are being added right now. Please check back soon, or message us on WhatsApp for our full catalogue.');
       setEmptyState('Nothing to show yet', msg, false);
     }
 
@@ -2872,33 +2833,34 @@
       orderSpan.textContent = t('order_button_text', 'Order on WhatsApp');
     }
 
-    // 3) Size popup title/message/button if the popup is currently open.
+    // 3) Size popup title / message / button — if open.
     var popupTitleEl = el('sizePopupTitle');
     if (popupTitleEl) {
       popupTitleEl.textContent = t('size_unavailable_title', 'Currently unavailable');
     }
     var popupMsgEl = document.querySelector('#sizePopup .popup-subtitle');
     if (popupMsgEl) {
-      var current = popupMsgEl.textContent || '';
-      var dash = current.indexOf(' — ');
-      var prefix = dash !== -1 ? current.slice(0, dash + 3) : '';
-      var baseMsg = t('size_unavailable_message',
-        'This size is not available right now. Please choose another size or message us on WhatsApp.');
-      popupMsgEl.textContent = prefix + baseMsg;
+      var sizeLabel = popupMsgEl.getAttribute('data-size') || '';
+      var fallback = 'Size ' + sizeLabel +
+        ' is not available right now. Please choose another size or message us on WhatsApp.';
+      var msg2 = t('size_unavailable_message', fallback);
+      if (msg2.indexOf('{size}') !== -1) msg2 = msg2.replace(/\{size\}/g, sizeLabel);
+      else if (msg2.indexOf('Size X') !== -1) msg2 = msg2.replace(/Size X/g, 'Size ' + sizeLabel);
+      else if (sizeLabel && msg2.indexOf(sizeLabel) === -1) msg2 = 'Size ' + sizeLabel + ' — ' + msg2;
+      popupMsgEl.textContent = msg2;
     }
     var popupBtnEl = document.querySelector('#sizePopup .popup-btn');
     if (popupBtnEl) {
       popupBtnEl.textContent = t('size_unavailable_button', 'OK');
     }
 
-    // 4) Re-render size chips for the currently-open product so the new
-    //    all_sizes list (or changed text) is reflected immediately.
+    // 4) Re-render size chips for the currently-open product (ALL_SIZES is
+    //    local, so this mainly re-applies styling after CSS updates).
     if (state.currentProduct) {
       renderSizes(state.currentProduct);
     }
   }
 
-  // Listen early — brand.js may fire siteContentLoaded before init() finishes.
   document.addEventListener('siteContentLoaded', function () {
     try { refreshDynamicStrings(); } catch (e) { /* ignore */ }
   });
@@ -2992,8 +2954,7 @@
       if (found) openProductById(found.id);
     });
 
-    // If site_content was already loaded before we finished init (rare),
-    // refresh dynamic strings now so nothing is stale.
+    // Catch site_content that loaded before init() finished.
     refreshDynamicStrings();
   }
 
