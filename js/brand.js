@@ -18,6 +18,10 @@
    script can re-render JS-built strings (product grid, order button, size
    popup, etc.) once the DB values are in.
 
+   Size-related keys are NOT part of site_content — sizes are managed by the
+   ALL_SIZES constant in js/script.js. brand.js simply ignores any such rows
+   if they happen to exist.
+
    Safety:
      - If site_content is missing / Supabase not ready / fetch fails, the page
        keeps whatever defaults are already inside index.html.
@@ -43,9 +47,17 @@
     hero_subtitle: 1,
     footer_text: 1,
     contact_address: 1,
-    empty_products_message: 1,
-    size_unavailable_message: 1
+    empty_products_message: 1
   };
+
+  /* Keys we do NOT want to apply from site_content even if they exist,
+     because sizes are managed in js/script.js (ALL_SIZES). */
+  function isIgnoredKey(key) {
+    if (!key) return true;
+    if (key === 'all_sizes') return true;
+    if (key.indexOf('size_') === 0) return true;
+    return false;
+  }
 
   /* --------------------------------------------------------------------
      Tiny helpers
@@ -54,10 +66,6 @@
 
   function isHttpUrl(s) {
     return typeof s === 'string' && /^https?:\/\//i.test(s.trim());
-  }
-
-  function safeTrim(s) {
-    return (s == null) ? '' : String(s).trim();
   }
 
   /* Get the shared Supabase client (same pattern as js/script.js / auth.js). */
@@ -79,31 +87,29 @@
      Fill a single element with a text value.
      Inputs use .placeholder; everything else uses .textContent.
      -------------------------------------------------------------------- */
-  function applyText(el, value, key) {
-    if (!el) return;
+  function applyText(node, value, key) {
+    if (!node) return;
     var text = String(value == null ? '' : value);
 
-    var tag = (el.tagName || '').toLowerCase();
+    var tag = (node.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') {
-      // Search box or other input → update placeholder and aria-label only.
-      el.setAttribute('placeholder', text);
-      if (!el.getAttribute('aria-label') || el.getAttribute('data-content') === 'search_placeholder') {
-        el.setAttribute('aria-label', text);
+      node.setAttribute('placeholder', text);
+      if (node.getAttribute('data-content') === 'search_placeholder') {
+        node.setAttribute('aria-label', text);
       }
       return;
     }
 
     if (tag === 'option') {
-      el.textContent = text;
+      node.textContent = text;
       return;
     }
 
-    // Preserve line breaks for multi-line keys.
     if (MULTILINE_KEYS[key]) {
-      el.style.whiteSpace = 'pre-line';
+      node.style.whiteSpace = 'pre-line';
     }
 
-    el.textContent = text;
+    node.textContent = text;
   }
 
   /* --------------------------------------------------------------------
@@ -113,7 +119,7 @@
     var nodes = document.querySelectorAll('[data-content]');
     Array.prototype.forEach.call(nodes, function (node) {
       var key = node.getAttribute('data-content');
-      if (!key) return;
+      if (!key || isIgnoredKey(key)) return;
       if (!Object.prototype.hasOwnProperty.call(SITE_CONTENT, key)) return;
       var value = SITE_CONTENT[key];
       if (value == null || value === '') return;  // keep HTML default
@@ -129,7 +135,7 @@
     var nodes = document.querySelectorAll('[data-content-href]');
     Array.prototype.forEach.call(nodes, function (node) {
       var key = node.getAttribute('data-content-href');
-      if (!key) return;
+      if (!key || isIgnoredKey(key)) return;
       var value = SITE_CONTENT[key];
 
       if (isHttpUrl(value)) {
@@ -162,8 +168,7 @@
 
   /* --------------------------------------------------------------------
      Fallback: read the Day 11 brand_settings row and use its values for
-     any site_content key that has no value yet (backward compatibility
-     while the admin has not edited the new fields).
+     any site_content key that has no value yet.
      -------------------------------------------------------------------- */
   async function fetchBrandFallback(sb) {
     try {
@@ -180,12 +185,13 @@
   }
 
   /* --------------------------------------------------------------------
-     Merge DB rows into SITE_CONTENT (skip empty values).
+     Merge DB rows into SITE_CONTENT (skip empty values, skip size keys).
      -------------------------------------------------------------------- */
   function mergeRows(rows) {
     if (!Array.isArray(rows)) return;
     rows.forEach(function (row) {
       if (!row || row.key == null) return;
+      if (isIgnoredKey(row.key)) return;
       var value = row.value;
       if (value == null) return;
       var text = String(value);
@@ -204,11 +210,11 @@
       facebook_url:  brand.facebook_url
     };
     Object.keys(map).forEach(function (k) {
+      if (isIgnoredKey(k)) return;
       var v = map[k];
       if (v == null) return;
       var s = String(v);
       if (!s.trim()) return;
-      // Only fill in if not already present from site_content.
       if (!SITE_CONTENT[k]) SITE_CONTENT[k] = s;
     });
   }
@@ -236,8 +242,6 @@
         detail: { content: SITE_CONTENT }
       }));
     } catch (e) {
-      // Very old browsers may not support CustomEvent constructor — use
-      // a plain event with a data property.
       try {
         var ev = document.createEvent('Event');
         ev.initEvent('siteContentLoaded', true, true);
@@ -258,15 +262,15 @@
     if (!sb) {
       LOADING = false;
       LOADED_ONCE = true;
-      // Apply the current (empty) map so any [data-content-href] anchors that
-      // start hidden stay hidden — no crash.
+      // Make sure any [data-content-href] anchors that start hidden stay
+      // hidden when there is no client.
       applyHrefBindings();
       fireLoaded();
       return;
     }
 
-    var rows    = await fetchSiteContent(sb);
-    var brand   = await fetchBrandFallback(sb);
+    var rows  = await fetchSiteContent(sb);
+    var brand = await fetchBrandFallback(sb);
 
     mergeRows(rows || []);
     mergeBrandFallback(brand);
@@ -280,8 +284,8 @@
   }
 
   /* --------------------------------------------------------------------
-     Boot — prefer VionaAuth.ready() so we share the same client. If that
-     API is not present, poll for the client for a few seconds.
+     Boot — prefer VionaAuth.ready() so we share the same client.
+     Falls back to a brief poll if that API is not present.
      -------------------------------------------------------------------- */
   function boot() {
     if (getClient()) { loadAll(); return; }
@@ -306,20 +310,15 @@
     }, 100);
   }
 
-  /* Re-apply bindings if new [data-content] nodes are inserted later
-     (e.g. product modal opened with a fresh Order button). */
+  /* Re-apply bindings when new [data-content] nodes are inserted later. */
   function reapply() {
     if (!LOADED_ONCE) return;
     applyTextBindings();
     applyHrefBindings();
   }
 
-  document.addEventListener('siteContentLoaded', function () {
-    // No-op: makes it explicit that we fire this for other scripts.
-  });
-
-  // Expose for js/script.js — it can call window.vionaBrand.apply() after
-  // it renders fresh DOM that uses data-content elements.
+  // Expose for other scripts — they can call window.vionaBrand.apply() after
+  // injecting fresh DOM that uses data-content elements.
   window.vionaBrand = {
     apply: reapply,
     get: function (k) { return SITE_CONTENT[k]; }
