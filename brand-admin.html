@@ -14,7 +14,7 @@
 
 <style>
   /* ------------------------------------------------------------------------
-     Design tokens — same Navy + Gold + Ivory as the main site.
+     Design tokens — same Navy / Gold / Ivory as the main site.
      ------------------------------------------------------------------------ */
   :root {
     --navy:   #0B1F3A;
@@ -221,7 +221,7 @@
   .footer-note a:hover { color: var(--gold); }
 
   /* ------------------------------------------------------------------------
-     Form screen — top bar + grouped sections + sticky save bar
+     Form screen — top bar, grouped sections, sticky save bar
      ------------------------------------------------------------------------ */
   .app-topbar {
     display: flex;
@@ -398,7 +398,7 @@
     border-radius: 999px;
   }
 
-  /* Sticky action bar at bottom of the form screen */
+  /* Sticky action bar */
   .save-bar {
     position: fixed;
     left: 50%;
@@ -473,7 +473,6 @@
     font-size: 13.5px;
   }
 
-  /* Small screens */
   @media (max-width: 520px) {
     body { padding: max(12px, env(safe-area-inset-top)) 12px max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
     .card { padding: 26px 20px 22px; border-radius: 16px; }
@@ -612,6 +611,15 @@
       .replace(/'/g, '&#39;');
   }
 
+  /* Keys we IGNORE on this page. Sizes live inside js/script.js (ALL_SIZES)
+     and must never be edited from here, even if old rows exist in DB. */
+  function isIgnoredKey(key) {
+    if (!key) return true;
+    if (key === 'all_sizes') return true;
+    if (key.indexOf('size_') === 0) return true;
+    return false;
+  }
+
   function showScreen(name) {
     hide($('screenLogin'));
     hide($('screenDenied'));
@@ -621,7 +629,6 @@
                : $('screenLogin');
     show(target);
 
-    // The sticky save bar only appears on the form screen.
     if (name === 'form') show($('saveBar'));
     else hide($('saveBar'));
 
@@ -681,10 +688,10 @@
   /* --------------------------------------------------------------------
      State
      -------------------------------------------------------------------- */
-  var ROWS = [];           // full row objects from site_content
+  var ROWS = [];           // filtered rows currently shown in the form
   var ORIGINAL = {};       // key → original value
   var CHANGED = {};        // key → true for edited rows
-  var SECTION_ORDER = ['Menu', 'Home', 'Collection', 'Sizes', 'About', 'Reviews', 'Contact', 'Footer', 'Social'];
+  var SECTION_ORDER = ['Menu', 'Home', 'Collection', 'About', 'Reviews', 'Contact', 'Footer', 'Social'];
 
   /* --------------------------------------------------------------------
      Auth actions
@@ -721,7 +728,7 @@
   }
 
   /* --------------------------------------------------------------------
-     Load site_content + build the form
+     Load site_content — skipping size-related keys
      -------------------------------------------------------------------- */
   async function loadRows() {
     try {
@@ -731,7 +738,12 @@
         .order('section', { ascending: true })
         .order('sort_order', { ascending: true });
       if (res && res.error) return null;
-      return (res && res.data) || [];
+      var rows = (res && res.data) || [];
+
+      // Never show size-related rows in this form.
+      return rows.filter(function (r) {
+        return r && r.key && !isIgnoredKey(r.key);
+      });
     } catch (e) {
       return null;
     }
@@ -755,6 +767,9 @@
     return known.concat(extras);
   }
 
+  /* --------------------------------------------------------------------
+     Build the form
+     -------------------------------------------------------------------- */
   function buildField(row) {
     var key = row.key;
     var value = row.value == null ? '' : String(row.value);
@@ -782,9 +797,7 @@
     }
     input.value = value;
     input.setAttribute('data-key', key);
-    input.setAttribute('data-original', value);
 
-    // On any edit compare to original and toggle the gold "Edited" state.
     input.addEventListener('input', function () {
       var original = ORIGINAL[key] == null ? '' : String(ORIGINAL[key]);
       var current  = input.value;
@@ -863,6 +876,7 @@
       list.appendChild(msg);
       show(list);
       hide($('formLoading'));
+      updateStatus();
       return;
     }
 
@@ -908,12 +922,19 @@
 
     var nowIso = new Date().toISOString();
 
-    // Only send the rows that actually changed.
-    var payload = keys.map(function (key) {
+    // Only send rows that actually changed, and skip ignored keys defensively.
+    var payload = keys.filter(function (key) { return !isIgnoredKey(key); }).map(function (key) {
       var field = document.querySelector('.field[data-key="' + cssEscape(key) + '"] input, .field[data-key="' + cssEscape(key) + '"] textarea');
       var value = field ? field.value : '';
       return { key: key, value: value, updated_at: nowIso };
     });
+
+    if (!payload.length) {
+      showMsg('formMsg', 'info', 'Nothing to save.', 3000);
+      if (btn) { btn.disabled = false; btn.textContent = 'Save all changes'; }
+      if (status) status.textContent = 'No changes yet';
+      return;
+    }
 
     try {
       var res = await sb
@@ -921,7 +942,6 @@
         .upsert(payload, { onConflict: 'key' });
       if (res && res.error) throw res.error;
 
-      // Success — refresh ORIGINAL from the current field values.
       payload.forEach(function (row) {
         ORIGINAL[row.key] = row.value;
       });
@@ -947,7 +967,7 @@
     }
   }
 
-  /* Minimal CSS.escape polyfill for older browsers — good enough for our keys. */
+  /* Minimal CSS.escape polyfill — good enough for our keys. */
   function cssEscape(s) {
     if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s);
     return String(s).replace(/["\\]/g, '\\$&');
@@ -970,7 +990,6 @@
       return;
     }
 
-    // Admin — show form, load rows.
     var ae = $('adminEmail');
     if (ae) ae.textContent = user.email || 'admin';
     clearMsg('formMsg');
