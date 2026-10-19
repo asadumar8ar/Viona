@@ -3,19 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Viona Bangles — Brand Admin</title>
-<meta name="robots" content="noindex" />
+<title>Viona Bangles — Site Content Admin</title>
+<meta name="robots" content="noindex, nofollow" />
 <meta name="theme-color" content="#0B1F3A" />
 <link rel="icon" type="image/png" href="images/favicon.png" />
 
-<!-- Fonts: Playfair Display (headings) + Poppins (body) — same as the main site -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
 <style>
   /* ------------------------------------------------------------------------
-     Design tokens — same Navy / Gold / Ivory as the main site.
+     Design tokens — same Navy + Gold + Ivory as the main site.
      ------------------------------------------------------------------------ */
   :root {
     --navy:   #0B1F3A;
@@ -24,7 +23,6 @@
     --gold:   #C9A24B;
     --gold-2: #E3C87F;
     --gold-line: rgba(201, 162, 75, .55);
-    --gold-soft: rgba(201, 162, 75, .18);
     --ivory:  #FBF8F2;
     --white:  #FFFFFF;
     --ink:    #0B1F3A;
@@ -53,22 +51,18 @@
     background-attachment: fixed;
     min-height: 100vh;
     min-height: 100dvh;
-    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    padding: max(16px, env(safe-area-inset-top)) 16px max(96px, calc(env(safe-area-inset-bottom) + 88px));
     display: flex;
     align-items: flex-start;
     justify-content: center;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ------------------------------------------------------------------------
-     Screens + Card
-     ------------------------------------------------------------------------ */
-  .screen {
-    width: 100%;
-    max-width: 680px;
-    margin: auto 0;      /* vertical centering when content is short */
-  }
+  .screen { width: 100%; max-width: 760px; margin: auto 0; }
 
+  /* ------------------------------------------------------------------------
+     Card + headings
+     ------------------------------------------------------------------------ */
   .card {
     width: 100%;
     background: var(--white);
@@ -78,7 +72,6 @@
     box-shadow: var(--shadow-lg);
     animation: popIn .22s ease;
   }
-
   @keyframes popIn {
     from { transform: scale(.97); opacity: 0; }
     to   { transform: scale(1);   opacity: 1; }
@@ -94,7 +87,6 @@
     text-align: center;
     margin-bottom: 6px;
   }
-
   .subtitle {
     text-align: center;
     font-size: 10.5px;
@@ -104,7 +96,6 @@
     margin: 0 0 22px;
     font-weight: 500;
   }
-
   .heading {
     font-family: var(--font-head);
     font-size: 24px;
@@ -114,7 +105,6 @@
     text-align: center;
     line-height: 1.25;
   }
-
   .lead {
     font-size: 14px;
     color: var(--muted);
@@ -132,8 +122,8 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-height: 48px;
-    padding: 12px 20px;
+    min-height: 46px;
+    padding: 11px 20px;
     border-radius: 12px;
     border: 1px solid transparent;
     font-family: inherit;
@@ -146,10 +136,9 @@
     white-space: nowrap;
   }
   .btn-gold:active, .btn-ghost:active { transform: translateY(1px); }
-  .btn-gold:disabled, .btn-ghost:disabled { opacity: .6; cursor: not-allowed; pointer-events: none; }
+  .btn-gold:disabled, .btn-ghost:disabled { opacity: .55; cursor: not-allowed; pointer-events: none; }
 
   .btn-gold {
-    width: 100%;
     background: linear-gradient(180deg, #D4AF63 0%, #C9A24B 100%);
     color: var(--navy);
     box-shadow: 0 6px 20px rgba(201, 162, 75, .35);
@@ -158,7 +147,6 @@
   .btn-gold:hover { background: linear-gradient(180deg, #DCB972 0%, #C9A24B 100%); }
 
   .btn-ghost {
-    width: auto;
     background: var(--white);
     border-color: rgba(11, 31, 58, .18);
     color: var(--navy);
@@ -167,11 +155,9 @@
     padding: 9px 16px;
   }
   .btn-ghost:hover { border-color: var(--gold); color: var(--gold); background: rgba(201, 162, 75, .06); }
-
   .btn-ghost-danger { color: var(--danger); border-color: rgba(179, 38, 30, .3); }
   .btn-ghost-danger:hover { background: rgba(179, 38, 30, .06); border-color: var(--danger); color: var(--danger); }
 
-  /* Google button — with the coloured G icon */
   .btn-google {
     display: flex;
     align-items: center;
@@ -194,7 +180,7 @@
   .btn-google svg { width: 18px; height: 18px; flex: 0 0 auto; }
 
   /* ------------------------------------------------------------------------
-     Messages (success / error / info)
+     Messages
      ------------------------------------------------------------------------ */
   .msg {
     margin: 14px 0 0;
@@ -209,124 +195,8 @@
   .msg.is-info    { background: #FFF6E5; border: 1px solid #F2D9A4; color: #7A4B00; }
 
   /* ------------------------------------------------------------------------
-     Form
+     Login / denied screens
      ------------------------------------------------------------------------ */
-  .form-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-  .form-head .title-block {
-    min-width: 0;
-    flex: 1 1 200px;
-  }
-  .form-head .brand { text-align: left; margin-bottom: 2px; font-size: 22px; }
-  .form-head .subtitle { text-align: left; margin: 0; letter-spacing: .28em; }
-
-  .user-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-  }
-  .user-email {
-    font-size: 12.5px;
-    color: var(--muted);
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: right;
-  }
-  @media (max-width: 480px) {
-    .user-box { width: 100%; justify-content: space-between; }
-    .user-email { text-align: left; max-width: 60%; }
-  }
-
-  .field {
-    display: block;
-    margin-bottom: 16px;
-  }
-  .field > span {
-    display: block;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .02em;
-    color: var(--ink);
-    margin-bottom: 6px;
-  }
-  .field small {
-    display: block;
-    margin-top: 5px;
-    font-size: 11.5px;
-    color: var(--muted-2);
-    line-height: 1.45;
-  }
-
-  .input,
-  .textarea {
-    width: 100%;
-    padding: 11px 13px;
-    border: 1.4px solid rgba(11, 31, 58, .16);
-    border-radius: 10px;
-    background: var(--white);
-    color: var(--ink);
-    font-family: inherit;
-    font-size: 14.5px;
-    line-height: 1.5;
-    transition: border-color .18s ease, box-shadow .18s ease;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-  .input:focus,
-  .textarea:focus {
-    outline: 0;
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px rgba(201, 162, 75, .22);
-  }
-  .textarea {
-    resize: vertical;
-    min-height: 180px;
-    font-family: inherit;
-  }
-
-  .grid2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-  @media (max-width: 520px) {
-    .grid2 { grid-template-columns: 1fr; }
-  }
-
-  .actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 22px;
-    padding-top: 18px;
-    border-top: 1px solid var(--line);
-    flex-wrap: wrap;
-    align-items: center;
-  }
-  .actions .btn-gold { flex: 1 1 180px; width: auto; }
-  .actions .btn-ghost { flex: 0 0 auto; }
-
-  .spinner {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid rgba(11, 31, 58, .25);
-    border-top-color: var(--navy);
-    animation: spin .7s linear infinite;
-    display: inline-block;
-    vertical-align: middle;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Denied screen */
   .denied-icon {
     width: 64px;
     height: 64px;
@@ -350,27 +220,281 @@
   .footer-note a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
   .footer-note a:hover { color: var(--gold); }
 
+  /* ------------------------------------------------------------------------
+     Form screen — top bar + grouped sections + sticky save bar
+     ------------------------------------------------------------------------ */
+  .app-topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .app-topbar .title-block { min-width: 0; flex: 1 1 200px; }
+  .app-topbar .brand { text-align: left; margin-bottom: 2px; font-size: 22px; }
+  .app-topbar .subtitle { text-align: left; margin: 0; letter-spacing: .28em; }
+
+  .user-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .user-email {
+    font-size: 12.5px;
+    color: var(--muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
+  @media (max-width: 480px) {
+    .user-box { width: 100%; justify-content: space-between; }
+    .user-email { text-align: left; max-width: 60%; }
+  }
+
+  .section-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .content-section {
+    background: var(--ivory);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .content-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--white);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    user-select: none;
+  }
+  .content-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .content-section-title .section-name {
+    font-family: var(--font-head);
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: .02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .content-section-title .section-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: rgba(201, 162, 75, .16);
+    color: #8A6A1F;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .content-section-toggle {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    transition: transform .2s ease, background .2s ease;
+  }
+  .content-section.is-collapsed .content-section-toggle { transform: rotate(-90deg); }
+  .content-section-head:hover .content-section-toggle { background: rgba(201, 162, 75, .14); border-color: var(--gold); color: var(--gold); }
+
+  .content-section-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .content-section.is-collapsed .content-section-body { display: none; }
+
+  /* Fields */
+  .field { display: block; }
+  .field .field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .field .field-label .field-key {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--muted-2);
+    letter-spacing: .04em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(11, 31, 58, .05);
+    white-space: nowrap;
+  }
+  .field input,
+  .field textarea {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1.4px solid rgba(11, 31, 58, .16);
+    border-radius: 10px;
+    background: var(--white);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 14.5px;
+    line-height: 1.5;
+    transition: border-color .18s ease, box-shadow .18s ease;
+    -webkit-appearance: none;
+    appearance: none;
+    box-sizing: border-box;
+  }
+  .field textarea {
+    resize: vertical;
+    min-height: 110px;
+    font-family: inherit;
+  }
+  .field input:focus,
+  .field textarea:focus {
+    outline: 0;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201, 162, 75, .22);
+  }
+  .field.is-changed input,
+  .field.is-changed textarea {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201, 162, 75, .18);
+  }
+  .field.is-changed .field-label::after {
+    content: "Edited";
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #8A6A1F;
+    background: #FBF3E1;
+    border: 1px solid #EAD9A8;
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+
+  /* Sticky action bar at bottom of the form screen */
+  .save-bar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 50;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(11, 31, 58, .95);
+    border: 1px solid var(--gold-line);
+    border-radius: 999px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .4);
+    max-width: calc(100vw - 24px);
+  }
+  .save-bar .save-status {
+    font-size: 12px;
+    color: rgba(255,255,255,.7);
+    padding: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .save-bar .btn-gold {
+    min-height: 40px;
+    padding: 9px 20px;
+    font-size: 13px;
+  }
+  .save-bar .btn-ghost {
+    background: transparent;
+    border-color: rgba(255,255,255,.28);
+    color: rgba(255,255,255,.85);
+    min-height: 40px;
+    padding: 9px 14px;
+    font-size: 12.5px;
+  }
+  .save-bar .btn-ghost:hover { background: rgba(255,255,255,.08); border-color: var(--gold-2); color: var(--gold-2); }
+  @media (max-width: 480px) {
+    .save-bar .save-status { display: none; }
+    .save-bar .btn-gold { flex: 1 1 auto; }
+  }
+
+  .form-msg {
+    margin: 0 0 14px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: left;
+  }
+  .form-msg.is-error   { background: #FDECEA; border: 1px solid #F4C7C2; color: var(--danger); }
+  .form-msg.is-success { background: #EAF7EE; border: 1px solid #BEE3C7; color: var(--success); }
+  .form-msg.is-info    { background: #FFF6E5; border: 1px solid #F2D9A4; color: #7A4B00; }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(11, 31, 58, .25);
+    border-top-color: var(--navy);
+    animation: spin .7s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-block {
+    padding: 40px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+
   /* Small screens */
   @media (max-width: 520px) {
-    body { padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+    body { padding: max(12px, env(safe-area-inset-top)) 12px max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
     .card { padding: 26px 20px 22px; border-radius: 16px; }
     .heading { font-size: 21px; }
     .brand { font-size: 26px; }
+    .app-topbar .brand { font-size: 20px; }
   }
 </style>
 </head>
 <body>
 
 <!-- ==========================================================================
-     1. LOGIN SCREEN — Google sign-in only
+     1. LOGIN SCREEN — Google only
      ========================================================================== -->
 <div class="screen" id="screenLogin">
   <div class="card">
     <div class="brand">Viona</div>
-    <div class="subtitle">Brand Admin</div>
+    <div class="subtitle">Site Content Admin</div>
 
     <h1 class="heading">Sign in to continue</h1>
-    <p class="lead">Continue with your Google admin account to edit the About section and brand details.</p>
+    <p class="lead">Continue with your Google admin account to edit every text on the website.</p>
 
     <button type="button" class="btn-google" id="googleBtn">
       <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -391,7 +515,7 @@
 </div>
 
 <!-- ==========================================================================
-     2. ACCESS DENIED SCREEN — signed in but not admin
+     2. ACCESS DENIED
      ========================================================================== -->
 <div class="screen" id="screenDenied" hidden>
   <div class="card">
@@ -408,7 +532,8 @@
 
     <p class="msg is-info" id="deniedEmail">Signed in as —</p>
 
-    <button type="button" class="btn-ghost btn-ghost-danger" id="deniedLogoutBtn" style="width:100%;justify-content:center;min-height:48px;">
+    <button type="button" class="btn-ghost btn-ghost-danger" id="deniedLogoutBtn"
+            style="width:100%;justify-content:center;min-height:48px;">
       Logout and try another account
     </button>
 
@@ -419,15 +544,15 @@
 </div>
 
 <!-- ==========================================================================
-     3. FORM SCREEN — signed in admin
+     3. FORM SCREEN
      ========================================================================== -->
 <div class="screen" id="screenForm" hidden>
   <div class="card">
 
-    <div class="form-head">
+    <div class="app-topbar">
       <div class="title-block">
         <div class="brand">Viona</div>
-        <div class="subtitle">Brand Admin</div>
+        <div class="subtitle">Site Content Admin</div>
       </div>
       <div class="user-box">
         <span class="user-email" id="adminEmail">—</span>
@@ -435,66 +560,34 @@
       </div>
     </div>
 
-    <h1 class="heading" style="text-align:left;margin-bottom:4px;">Edit brand details</h1>
-    <p class="lead" style="text-align:left;margin-bottom:20px;">
-      These values appear on the homepage. Leave a field empty to keep the current website default.
+    <h1 class="heading" style="text-align:left;margin-bottom:4px;">Edit website texts</h1>
+    <p class="lead" style="text-align:left;margin-bottom:18px;">
+      Every field below appears somewhere on the homepage. Change what you need and tap <strong>Save all changes</strong>.
     </p>
 
-    <form id="brandForm" onsubmit="return false;" novalidate>
+    <p class="form-msg" id="formMsg" hidden></p>
 
-      <!-- Tagline -->
-      <label class="field">
-        <span>Tagline (under hero heading)</span>
-        <input type="text" id="fTagline" class="input" maxlength="200"
-               placeholder="Where tradition meets timeless elegance." />
-        <small>One line shown in gold italic under the hero heading.</small>
-      </label>
+    <div id="formLoading" class="loading-block">
+      <span class="spinner" aria-hidden="true"></span>
+      <div style="margin-top:8px;">Loading content…</div>
+    </div>
 
-      <!-- About title -->
-      <label class="field">
-        <span>About section title</span>
-        <input type="text" id="fAboutTitle" class="input" maxlength="120"
-               placeholder="The Viona Story" />
-      </label>
-
-      <!-- About text (multi-line) -->
-      <label class="field">
-        <span>Brand story (multi-line)</span>
-        <textarea id="fAboutText" class="textarea" rows="10" maxlength="4000"
-                  placeholder="Write the story here. Line breaks are preserved exactly as typed."></textarea>
-        <small>Blank lines between paragraphs are preserved on the website.</small>
-      </label>
-
-      <!-- Social URLs -->
-      <div class="grid2">
-        <label class="field">
-          <span>Instagram URL</span>
-          <input type="url" id="fIgUrl" class="input"
-                 placeholder="https://instagram.com/vionabangles" />
-          <small>Leave empty to hide the footer icon.</small>
-        </label>
-        <label class="field">
-          <span>Facebook URL</span>
-          <input type="url" id="fFbUrl" class="input"
-                 placeholder="https://facebook.com/vionabangles" />
-          <small>Leave empty to hide the footer icon.</small>
-        </label>
-      </div>
-
-      <!-- Actions -->
-      <div class="actions">
-        <button type="button" class="btn-gold" id="saveBtn">Save changes</button>
-        <a class="btn-ghost" id="viewSiteLink" href="index.html" target="_blank" rel="noopener">View website</a>
-      </div>
-
-      <p class="msg" id="formMsg" hidden></p>
-    </form>
+    <div class="section-list" id="sectionList" hidden></div>
 
   </div>
 </div>
 
 <!-- ==========================================================================
-     SCRIPTS — supabase CDN + config.js, then inline logic
+     Sticky save bar (only visible on the form screen)
+     ========================================================================== -->
+<div class="save-bar" id="saveBar" hidden>
+  <span class="save-status" id="saveStatus">No changes yet</span>
+  <a class="btn-ghost" href="index.html" target="_blank" rel="noopener">View website</a>
+  <button class="btn-gold" id="saveAllBtn" type="button">Save all changes</button>
+</div>
+
+<!-- ==========================================================================
+     SCRIPTS
      ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
@@ -509,6 +602,15 @@
   function $(id) { return document.getElementById(id); }
   function show(el) { if (el) el.hidden = false; }
   function hide(el) { if (el) el.hidden = true; }
+  function esc(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   function showScreen(name) {
     hide($('screenLogin'));
@@ -518,6 +620,11 @@
                : name === 'denied' ? $('screenDenied')
                : $('screenLogin');
     show(target);
+
+    // The sticky save bar only appears on the form screen.
+    if (name === 'form') show($('saveBar'));
+    else hide($('saveBar'));
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -525,9 +632,9 @@
     var el = $(id);
     if (!el) return;
     el.textContent = String(text || '');
-    el.className = 'msg ' + (kind === 'success' ? 'is-success'
-                           : kind === 'error'   ? 'is-error'
-                           : 'is-info');
+    el.className = 'form-msg ' + (kind === 'success' ? 'is-success'
+                                : kind === 'error'   ? 'is-error'
+                                : 'is-info');
     el.hidden = false;
     if (autoHide) {
       clearTimeout(el._hideTimer);
@@ -543,7 +650,7 @@
   }
 
   /* --------------------------------------------------------------------
-     Create the Supabase client (same pattern as js/auth.js)
+     Supabase client
      -------------------------------------------------------------------- */
   function createClient() {
     var cfg = window.VIONA_CONFIG || {};
@@ -553,13 +660,7 @@
       return window.supabase.createClient(
         cfg.SUPABASE_URL,
         cfg.SUPABASE_ANON_KEY,
-        {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true
-          }
-        }
+        { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
       );
     } catch (e) {
       return null;
@@ -568,7 +669,6 @@
 
   var sb = createClient();
   if (!sb) {
-    // Config missing or CDN blocked — show a clear message on the login screen.
     document.addEventListener('DOMContentLoaded', function () {
       showMsg('loginMsg', 'error',
         'Supabase config missing or the Supabase library failed to load. Check js/config.js and your internet connection.');
@@ -579,39 +679,37 @@
   }
 
   /* --------------------------------------------------------------------
-     Google sign-in
+     State
+     -------------------------------------------------------------------- */
+  var ROWS = [];           // full row objects from site_content
+  var ORIGINAL = {};       // key → original value
+  var CHANGED = {};        // key → true for edited rows
+  var SECTION_ORDER = ['Menu', 'Home', 'Collection', 'Sizes', 'About', 'Reviews', 'Contact', 'Footer', 'Social'];
+
+  /* --------------------------------------------------------------------
+     Auth actions
      -------------------------------------------------------------------- */
   async function onGoogleClick() {
     var btn = $('googleBtn');
     if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
     clearMsg('loginMsg');
-
     try {
-      // After Google, Supabase redirects back to this exact page.
       var redirectTo = window.location.origin + window.location.pathname;
       var res = await sb.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: redirectTo }
       });
       if (res && res.error) throw res.error;
-      // Browser is navigating to Google. Keep the button disabled.
     } catch (err) {
       if (btn) { btn.disabled = false; btn.style.opacity = ''; }
       showMsg('loginMsg', 'error', (err && err.message) || 'Google sign-in failed. Please try again.');
     }
   }
 
-  /* --------------------------------------------------------------------
-     Logout
-     -------------------------------------------------------------------- */
   async function onLogoutClick() {
     try { await sb.auth.signOut(); } catch (e) { /* ignore */ }
-    // onAuthStateChange will fire SIGNED_OUT and reset the UI.
   }
 
-  /* --------------------------------------------------------------------
-     Admin check + form load
-     -------------------------------------------------------------------- */
   async function isAdminRpc() {
     try {
       var res = await sb.rpc('is_admin');
@@ -622,98 +720,266 @@
     }
   }
 
-  async function loadRow() {
+  /* --------------------------------------------------------------------
+     Load site_content + build the form
+     -------------------------------------------------------------------- */
+  async function loadRows() {
     try {
       var res = await sb
-        .from('brand_settings')
-        .select('tagline, about_title, about_text, instagram_url, facebook_url')
-        .eq('id', 1)
-        .maybeSingle();
+        .from('site_content')
+        .select('key,value,label,section,input_type,sort_order')
+        .order('section', { ascending: true })
+        .order('sort_order', { ascending: true });
       if (res && res.error) return null;
-      return (res && res.data) || null;
+      return (res && res.data) || [];
     } catch (e) {
       return null;
     }
   }
 
-  function fillForm(row) {
-    row = row || {};
-    $('fTagline').value    = row.tagline       || '';
-    $('fAboutTitle').value = row.about_title   || '';
-    $('fAboutText').value  = row.about_text    || '';
-    $('fIgUrl').value      = row.instagram_url || '';
-    $('fFbUrl').value      = row.facebook_url  || '';
+  function groupBySection(rows) {
+    var map = {};
+    rows.forEach(function (r) {
+      var sec = r.section || 'Other';
+      if (!map[sec]) map[sec] = [];
+      map[sec].push(r);
+    });
+    return map;
+  }
+
+  function orderedSections(grouped) {
+    var known = SECTION_ORDER.filter(function (s) { return grouped[s]; });
+    var extras = Object.keys(grouped).filter(function (s) {
+      return SECTION_ORDER.indexOf(s) === -1;
+    }).sort();
+    return known.concat(extras);
+  }
+
+  function buildField(row) {
+    var key = row.key;
+    var value = row.value == null ? '' : String(row.value);
+    var label = row.label || key;
+    var inputType = (row.input_type || 'text').toLowerCase();
+
+    var wrap = document.createElement('div');
+    wrap.className = 'field';
+    wrap.setAttribute('data-key', key);
+
+    var labelEl = document.createElement('div');
+    labelEl.className = 'field-label';
+    labelEl.innerHTML =
+      '<span>' + esc(label) + '</span>' +
+      '<span class="field-key">' + esc(key) + '</span>';
+    wrap.appendChild(labelEl);
+
+    var input;
+    if (inputType === 'textarea') {
+      input = document.createElement('textarea');
+      input.rows = 5;
+    } else {
+      input = document.createElement('input');
+      input.type = 'text';
+    }
+    input.value = value;
+    input.setAttribute('data-key', key);
+    input.setAttribute('data-original', value);
+
+    // On any edit compare to original and toggle the gold "Edited" state.
+    input.addEventListener('input', function () {
+      var original = ORIGINAL[key] == null ? '' : String(ORIGINAL[key]);
+      var current  = input.value;
+      var changed  = current !== original;
+      if (changed) {
+        CHANGED[key] = true;
+        wrap.classList.add('is-changed');
+      } else {
+        delete CHANGED[key];
+        wrap.classList.remove('is-changed');
+      }
+      updateStatus();
+    });
+
+    wrap.appendChild(input);
+    ORIGINAL[key] = value;
+    return wrap;
+  }
+
+  function buildSection(sectionName, rows) {
+    var sectionEl = document.createElement('section');
+    sectionEl.className = 'content-section';
+
+    var head = document.createElement('div');
+    head.className = 'content-section-head';
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    head.setAttribute('aria-expanded', 'true');
+
+    head.innerHTML =
+      '<div class="content-section-title">' +
+        '<span class="section-name">' + esc(sectionName) + '</span>' +
+        '<span class="section-count">' + rows.length + '</span>' +
+      '</div>' +
+      '<span class="content-section-toggle" aria-hidden="true">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="6 9 12 15 18 9"></polyline>' +
+        '</svg>' +
+      '</span>';
+
+    var body = document.createElement('div');
+    body.className = 'content-section-body';
+
+    rows.forEach(function (row) {
+      body.appendChild(buildField(row));
+    });
+
+    sectionEl.appendChild(head);
+    sectionEl.appendChild(body);
+
+    function toggleCollapse() {
+      var collapsed = sectionEl.classList.toggle('is-collapsed');
+      head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    head.addEventListener('click', toggleCollapse);
+    head.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCollapse(); }
+    });
+
+    return sectionEl;
+  }
+
+  function renderForm(rows) {
+    ROWS = Array.isArray(rows) ? rows : [];
+    ORIGINAL = {};
+    CHANGED = {};
+
+    var list = $('sectionList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (!ROWS.length) {
+      var msg = document.createElement('p');
+      msg.className = 'loading-block';
+      msg.textContent = 'No content rows found in public.site_content. Please run the Day 12 SQL.';
+      list.appendChild(msg);
+      show(list);
+      hide($('formLoading'));
+      return;
+    }
+
+    var grouped = groupBySection(ROWS);
+    var order = orderedSections(grouped);
+
+    order.forEach(function (sec) {
+      list.appendChild(buildSection(sec, grouped[sec]));
+    });
+
+    updateStatus();
+    hide($('formLoading'));
+    show(list);
   }
 
   /* --------------------------------------------------------------------
-     Save — upsert on id = 1, set updated_at
+     Status + save
      -------------------------------------------------------------------- */
-  async function onSave() {
-    var btn = $('saveBtn');
-    var original = btn ? btn.textContent : 'Save changes';
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Saving…';
+  function updateStatus() {
+    var count = Object.keys(CHANGED).length;
+    var status = $('saveStatus');
+    if (!status) return;
+    if (count === 0) {
+      status.textContent = 'No changes yet';
+    } else {
+      status.textContent = count + ' field' + (count === 1 ? '' : 's') + ' edited';
     }
+  }
+
+  async function onSaveAll() {
+    var keys = Object.keys(CHANGED);
+    var btn = $('saveAllBtn');
+    var status = $('saveStatus');
     clearMsg('formMsg');
 
-    var payload = {
-      id: 1,
-      tagline:       String($('fTagline').value || '').trim(),
-      about_title:   String($('fAboutTitle').value || '').trim(),
-      about_text:    String($('fAboutText').value || '').trim(),
-      instagram_url: String($('fIgUrl').value || '').trim(),
-      facebook_url:  String($('fFbUrl').value || '').trim(),
-      updated_at:    new Date().toISOString()
-    };
+    if (!keys.length) {
+      showMsg('formMsg', 'info', 'Nothing has changed since the last save.', 3000);
+      return;
+    }
+
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="border-top-color:#0B1F3A;"></span> Saving…'; }
+    if (status) status.textContent = 'Saving…';
+
+    var nowIso = new Date().toISOString();
+
+    // Only send the rows that actually changed.
+    var payload = keys.map(function (key) {
+      var field = document.querySelector('.field[data-key="' + cssEscape(key) + '"] input, .field[data-key="' + cssEscape(key) + '"] textarea');
+      var value = field ? field.value : '';
+      return { key: key, value: value, updated_at: nowIso };
+    });
 
     try {
       var res = await sb
-        .from('brand_settings')
-        .upsert(payload, { onConflict: 'id' });
-
+        .from('site_content')
+        .upsert(payload, { onConflict: 'key' });
       if (res && res.error) throw res.error;
 
-      showMsg('formMsg', 'success', 'Saved successfully. The website is already updated.', 4000);
+      // Success — refresh ORIGINAL from the current field values.
+      payload.forEach(function (row) {
+        ORIGINAL[row.key] = row.value;
+      });
+      CHANGED = {};
+      document.querySelectorAll('.field.is-changed').forEach(function (f) {
+        f.classList.remove('is-changed');
+      });
+      updateStatus();
+      showMsg('formMsg', 'success', 'Saved ' + payload.length + ' field' +
+        (payload.length === 1 ? '' : 's') + '. The website is already updated.', 4500);
     } catch (err) {
       var msg = (err && (err.message || err.error_description)) || 'Could not save. Please try again.';
       if (/permission|row-level security|not allowed|jwt/i.test(String(msg))) {
         msg = 'You do not have admin access to save these details. Please log in with the admin Google account.';
       }
       showMsg('formMsg', 'error', msg);
+      if (status) status.textContent = 'Save failed';
     } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = original;
+      if (btn) { btn.disabled = false; btn.textContent = 'Save all changes'; }
+      if (status && Object.keys(CHANGED).length === 0) {
+        status.textContent = 'No changes yet';
       }
     }
   }
 
+  /* Minimal CSS.escape polyfill for older browsers — good enough for our keys. */
+  function cssEscape(s) {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s);
+    return String(s).replace(/["\\]/g, '\\$&');
+  }
+
   /* --------------------------------------------------------------------
-     Auth flow — decide which screen to show
+     Auth flow
      -------------------------------------------------------------------- */
   async function handleUser(user) {
     if (!user) {
-      hide($('screenDenied'));
-      hide($('screenForm'));
       showScreen('login');
       return;
     }
 
     var admin = await isAdminRpc();
     if (!admin) {
-      $('deniedEmail').textContent = 'Signed in as ' + (user.email || '—');
+      var de = $('deniedEmail');
+      if (de) de.textContent = 'Signed in as ' + (user.email || '—');
       showScreen('denied');
       return;
     }
 
-    // Admin — fill the form and show it.
-    $('adminEmail').textContent = user.email || 'admin';
+    // Admin — show form, load rows.
+    var ae = $('adminEmail');
+    if (ae) ae.textContent = user.email || 'admin';
     clearMsg('formMsg');
-
-    var row = await loadRow();
-    fillForm(row || {});
+    hide($('sectionList'));
+    show($('formLoading'));
     showScreen('form');
+
+    var rows = await loadRows();
+    renderForm(rows || []);
   }
 
   /* --------------------------------------------------------------------
@@ -729,19 +995,21 @@
     var lb = $('logoutBtn');
     if (lb) lb.addEventListener('click', onLogoutClick);
 
-    var sv = $('saveBtn');
-    if (sv) sv.addEventListener('click', onSave);
+    var sv = $('saveAllBtn');
+    if (sv) sv.addEventListener('click', onSaveAll);
 
-    // Enter inside single-line fields should NOT submit the form (button is type=button),
-    // but let's prevent the implicit submit anyway.
-    var f = $('brandForm');
-    if (f) f.addEventListener('submit', function (e) { e.preventDefault(); });
+    // Warn on close if there are unsaved edits.
+    window.addEventListener('beforeunload', function (e) {
+      if (Object.keys(CHANGED).length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
   }
 
   async function boot() {
     wire();
 
-    // Initial session (also handles the redirect back from Google).
     try {
       var s = await sb.auth.getSession();
       var session = s && s.data ? s.data.session : null;
@@ -750,9 +1018,7 @@
       showScreen('login');
     }
 
-    // React to every auth change from now on.
     sb.auth.onAuthStateChange(function (event, session) {
-      // Defer slightly so supabase finishes its internal bookkeeping.
       setTimeout(function () {
         handleUser(session ? session.user : null).catch(function () {});
       }, 0);
