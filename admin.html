@@ -161,7 +161,7 @@
           <option value="hidden">Hidden only</option>
         </select>
 
-        <!-- NEW: filter by stock status -->
+        <!-- filter by stock status -->
         <select id="productFilterStock" class="input" aria-label="Filter by stock status">
           <option value="">All stock</option>
           <option value="in_stock">In stock</option>
@@ -206,6 +206,18 @@
                     maxlength="140"
                     placeholder="e.g. Festive sale — flat 20% off on all bridal bangles!"></textarea>
           <small class="hint"><span id="offerTextCount">0</span> / 140 characters</small>
+        </label>
+
+        <!-- "Shop now" link — public website uses this URL for the button.
+             Leave empty to hide the button. -->
+        <label class="field">
+          <span>Offer link ("Shop now" button) <small class="hint-inline">— optional</small></span>
+          <input type="url"
+                 id="setOfferLink"
+                 class="input"
+                 placeholder="https://vionabangles.com/#collections"
+                 autocomplete="off" />
+          <small class="hint">Full URL. Leave blank to hide the "Shop now" button.</small>
         </label>
 
         <div class="banner-preview-wrap">
