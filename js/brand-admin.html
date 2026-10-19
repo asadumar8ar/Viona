@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Viona Bangles — Brand Admin</title>
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#0B1F3A" />
+<link rel="icon" type="image/png" href="images/favicon.png" />
+
+<!-- Fonts: Playfair Display (headings) + Poppins (body) — same as the main site -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  /* ------------------------------------------------------------------------
+     Design tokens — same Navy / Gold / Ivory as the main site.
+     ------------------------------------------------------------------------ */
+  :root {
+    --navy:   #0B1F3A;
+    --navy-2: #081428;
+    --navy-3: #14294A;
+    --gold:   #C9A24B;
+    --gold-2: #E3C87F;
+    --gold-line: rgba(201, 162, 75, .55);
+    --gold-soft: rgba(201, 162, 75, .18);
+    --ivory:  #FBF8F2;
+    --white:  #FFFFFF;
+    --ink:    #0B1F3A;
+    --muted:  #5A6472;
+    --muted-2:#8A8F98;
+    --line:   rgba(11, 31, 58, .12);
+    --danger: #B3261E;
+    --success:#1E7A46;
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, .35);
+    --font-head: "Playfair Display", Georgia, serif;
+    --font-body: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; }
+  [hidden] { display: none !important; }
+
+  body {
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(201, 162, 75, .22), transparent 60%),
+      linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 55%, var(--navy-3) 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ------------------------------------------------------------------------
+     Screens + Card
+     ------------------------------------------------------------------------ */
+  .screen {
+    width: 100%;
+    max-width: 680px;
+    margin: auto 0;      /* vertical centering when content is short */
+  }
+
+  .card {
+    width: 100%;
+    background: var(--white);
+    border-radius: 20px;
+    border-top: 4px solid var(--gold);
+    padding: 32px 26px 28px;
+    box-shadow: var(--shadow-lg);
+    animation: popIn .22s ease;
+  }
+
+  @keyframes popIn {
+    from { transform: scale(.97); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  .brand {
+    font-family: var(--font-head);
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: .5px;
+    line-height: 1;
+    text-align: center;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 10.5px;
+    letter-spacing: .34em;
+    text-transform: uppercase;
+    color: var(--muted-2);
+    margin: 0 0 22px;
+    font-weight: 500;
+  }
+
+  .heading {
+    font-family: var(--font-head);
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 8px;
+    text-align: center;
+    line-height: 1.25;
+  }
+
+  .lead {
+    font-size: 14px;
+    color: var(--muted);
+    text-align: center;
+    margin: 0 0 22px;
+    line-height: 1.6;
+  }
+
+  /* ------------------------------------------------------------------------
+     Buttons
+     ------------------------------------------------------------------------ */
+  .btn-gold,
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: .02em;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform .12s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
+    white-space: nowrap;
+  }
+  .btn-gold:active, .btn-ghost:active { transform: translateY(1px); }
+  .btn-gold:disabled, .btn-ghost:disabled { opacity: .6; cursor: not-allowed; pointer-events: none; }
+
+  .btn-gold {
+    width: 100%;
+    background: linear-gradient(180deg, #D4AF63 0%, #C9A24B 100%);
+    color: var(--navy);
+    box-shadow: 0 6px 20px rgba(201, 162, 75, .35);
+    font-weight: 600;
+  }
+  .btn-gold:hover { background: linear-gradient(180deg, #DCB972 0%, #C9A24B 100%); }
+
+  .btn-ghost {
+    width: auto;
+    background: var(--white);
+    border-color: rgba(11, 31, 58, .18);
+    color: var(--navy);
+    font-size: 13px;
+    min-height: 40px;
+    padding: 9px 16px;
+  }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); background: rgba(201, 162, 75, .06); }
+
+  .btn-ghost-danger { color: var(--danger); border-color: rgba(179, 38, 30, .3); }
+  .btn-ghost-danger:hover { background: rgba(179, 38, 30, .06); border-color: var(--danger); color: var(--danger); }
+
+  /* Google button — with the coloured G icon */
+  .btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 18px;
+    border: 1.4px solid rgba(11, 31, 58, .18);
+    border-radius: 12px;
+    background: var(--white);
+    color: var(--navy);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color .2s ease;
+  }
+  .btn-google:hover { border-color: var(--gold); }
+  .btn-google svg { width: 18px; height: 18px; flex: 0 0 auto; }
+
+  /* ------------------------------------------------------------------------
+     Messages (success / error / info)
+     ------------------------------------------------------------------------ */
+  .msg {
+    margin: 14px 0 0;
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: left;
+  }
+  .msg.is-error   { background: #FDECEA; border: 1px solid #F4C7C2; color: var(--danger); }
+  .msg.is-success { background: #EAF7EE; border: 1px solid #BEE3C7; color: var(--success); }
+  .msg.is-info    { background: #FFF6E5; border: 1px solid #F2D9A4; color: #7A4B00; }
+
+  /* ------------------------------------------------------------------------
+     Form
+     ------------------------------------------------------------------------ */
+  .form-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .form-head .title-block {
+    min-width: 0;
+    flex: 1 1 200px;
+  }
+  .form-head .brand { text-align: left; margin-bottom: 2px; font-size: 22px; }
+  .form-head .subtitle { text-align: left; margin: 0; letter-spacing: .28em; }
+
+  .user-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .user-email {
+    font-size: 12.5px;
+    color: var(--muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
+  @media (max-width: 480px) {
+    .user-box { width: 100%; justify-content: space-between; }
+    .user-email { text-align: left; max-width: 60%; }
+  }
+
+  .field {
+    display: block;
+    margin-bottom: 16px;
+  }
+  .field > span {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .field small {
+    display: block;
+    margin-top: 5px;
+    font-size: 11.5px;
+    color: var(--muted-2);
+    line-height: 1.45;
+  }
+
+  .input,
+  .textarea {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1.4px solid rgba(11, 31, 58, .16);
+    border-radius: 10px;
+    background: var(--white);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 14.5px;
+    line-height: 1.5;
+    transition: border-color .18s ease, box-shadow .18s ease;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .input:focus,
+  .textarea:focus {
+    outline: 0;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201, 162, 75, .22);
+  }
+  .textarea {
+    resize: vertical;
+    min-height: 180px;
+    font-family: inherit;
+  }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 520px) {
+    .grid2 { grid-template-columns: 1fr; }
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .actions .btn-gold { flex: 1 1 180px; width: auto; }
+  .actions .btn-ghost { flex: 0 0 auto; }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(11, 31, 58, .25);
+    border-top-color: var(--navy);
+    animation: spin .7s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Denied screen */
+  .denied-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: #FDECEA;
+    border: 1px solid #F4C7C2;
+    display: grid;
+    place-items: center;
+    color: var(--danger);
+  }
+  .denied-icon svg { width: 30px; height: 30px; }
+
+  .footer-note {
+    margin-top: 22px;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--muted-2);
+    line-height: 1.55;
+  }
+  .footer-note a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+  .footer-note a:hover { color: var(--gold); }
+
+  /* Small screens */
+  @media (max-width: 520px) {
+    body { padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+    .card { padding: 26px 20px 22px; border-radius: 16px; }
+    .heading { font-size: 21px; }
+    .brand { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==========================================================================
+     1. LOGIN SCREEN — Google sign-in only
+     ========================================================================== -->
+<div class="screen" id="screenLogin">
+  <div class="card">
+    <div class="brand">Viona</div>
+    <div class="subtitle">Brand Admin</div>
+
+    <h1 class="heading">Sign in to continue</h1>
+    <p class="lead">Continue with your Google admin account to edit the About section and brand details.</p>
+
+    <button type="button" class="btn-google" id="googleBtn">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.3 26.7 36 24 36c-5.2 0-9.6-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.2C36.9 40.3 44 35 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+      </svg>
+      <span>Continue with Google</span>
+    </button>
+
+    <p class="msg is-error" id="loginMsg" hidden></p>
+
+    <p class="footer-note">
+      <a href="index.html">← Back to website</a>
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     2. ACCESS DENIED SCREEN — signed in but not admin
+     ========================================================================== -->
+<div class="screen" id="screenDenied" hidden>
+  <div class="card">
+    <div class="denied-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"></circle>
+        <line x1="8" y1="12" x2="16" y2="12"></line>
+      </svg>
+    </div>
+
+    <h1 class="heading">Access denied — admin only</h1>
+    <p class="lead">This account is not allowed to edit the website. Sign in with an admin Google account.</p>
+
+    <p class="msg is-info" id="deniedEmail">Signed in as —</p>
+
+    <button type="button" class="btn-ghost btn-ghost-danger" id="deniedLogoutBtn" style="width:100%;justify-content:center;min-height:48px;">
+      Logout and try another account
+    </button>
+
+    <p class="footer-note">
+      <a href="index.html">← Back to website</a>
+    </p>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     3. FORM SCREEN — signed in admin
+     ========================================================================== -->
+<div class="screen" id="screenForm" hidden>
+  <div class="card">
+
+    <div class="form-head">
+      <div class="title-block">
+        <div class="brand">Viona</div>
+        <div class="subtitle">Brand Admin</div>
+      </div>
+      <div class="user-box">
+        <span class="user-email" id="adminEmail">—</span>
+        <button type="button" class="btn-ghost btn-ghost-danger" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+
+    <h1 class="heading" style="text-align:left;margin-bottom:4px;">Edit brand details</h1>
+    <p class="lead" style="text-align:left;margin-bottom:20px;">
+      These values appear on the homepage. Leave a field empty to keep the current website default.
+    </p>
+
+    <form id="brandForm" onsubmit="return false;" novalidate>
+
+      <!-- Tagline -->
+      <label class="field">
+        <span>Tagline (under hero heading)</span>
+        <input type="text" id="fTagline" class="input" maxlength="200"
+               placeholder="Where tradition meets timeless elegance." />
+        <small>One line shown in gold italic under the hero heading.</small>
+      </label>
+
+      <!-- About title -->
+      <label class="field">
+        <span>About section title</span>
+        <input type="text" id="fAboutTitle" class="input" maxlength="120"
+               placeholder="The Viona Story" />
+      </label>
+
+      <!-- About text (multi-line) -->
+      <label class="field">
+        <span>Brand story (multi-line)</span>
+        <textarea id="fAboutText" class="textarea" rows="10" maxlength="4000"
+                  placeholder="Write the story here. Line breaks are preserved exactly as typed."></textarea>
+        <small>Blank lines between paragraphs are preserved on the website.</small>
+      </label>
+
+      <!-- Social URLs -->
+      <div class="grid2">
+        <label class="field">
+          <span>Instagram URL</span>
+          <input type="url" id="fIgUrl" class="input"
+                 placeholder="https://instagram.com/vionabangles" />
+          <small>Leave empty to hide the footer icon.</small>
+        </label>
+        <label class="field">
+          <span>Facebook URL</span>
+          <input type="url" id="fFbUrl" class="input"
+                 placeholder="https://facebook.com/vionabangles" />
+          <small>Leave empty to hide the footer icon.</small>
+        </label>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button type="button" class="btn-gold" id="saveBtn">Save changes</button>
+        <a class="btn-ghost" id="viewSiteLink" href="index.html" target="_blank" rel="noopener">View website</a>
+      </div>
+
+      <p class="msg" id="formMsg" hidden></p>
+    </form>
+
+  </div>
+</div>
+
+<!-- ==========================================================================
+     SCRIPTS — supabase CDN + config.js, then inline logic
+     ========================================================================== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* --------------------------------------------------------------------
+     Helpers
+     -------------------------------------------------------------------- */
+  function $(id) { return document.getElementById(id); }
+  function show(el) { if (el) el.hidden = false; }
+  function hide(el) { if (el) el.hidden = true; }
+
+  function showScreen(name) {
+    hide($('screenLogin'));
+    hide($('screenDenied'));
+    hide($('screenForm'));
+    var target = name === 'form'   ? $('screenForm')
+               : name === 'denied' ? $('screenDenied')
+               : $('screenLogin');
+    show(target);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showMsg(id, kind, text, autoHide) {
+    var el = $(id);
+    if (!el) return;
+    el.textContent = String(text || '');
+    el.className = 'msg ' + (kind === 'success' ? 'is-success'
+                           : kind === 'error'   ? 'is-error'
+                           : 'is-info');
+    el.hidden = false;
+    if (autoHide) {
+      clearTimeout(el._hideTimer);
+      el._hideTimer = setTimeout(function () { el.hidden = true; }, autoHide);
+    }
+  }
+  function clearMsg(id) {
+    var el = $(id);
+    if (!el) return;
+    clearTimeout(el._hideTimer);
+    el.textContent = '';
+    el.hidden = true;
+  }
+
+  /* --------------------------------------------------------------------
+     Create the Supabase client (same pattern as js/auth.js)
+     -------------------------------------------------------------------- */
+  function createClient() {
+    var cfg = window.VIONA_CONFIG || {};
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') return null;
+    if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) return null;
+    try {
+      return window.supabase.createClient(
+        cfg.SUPABASE_URL,
+        cfg.SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        }
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  var sb = createClient();
+  if (!sb) {
+    // Config missing or CDN blocked — show a clear message on the login screen.
+    document.addEventListener('DOMContentLoaded', function () {
+      showMsg('loginMsg', 'error',
+        'Supabase config missing or the Supabase library failed to load. Check js/config.js and your internet connection.');
+      var g = $('googleBtn');
+      if (g) { g.disabled = true; g.style.opacity = '0.6'; g.style.cursor = 'not-allowed'; }
+    });
+    return;
+  }
+
+  /* --------------------------------------------------------------------
+     Google sign-in
+     -------------------------------------------------------------------- */
+  async function onGoogleClick() {
+    var btn = $('googleBtn');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
+    clearMsg('loginMsg');
+
+    try {
+      // After Google, Supabase redirects back to this exact page.
+      var redirectTo = window.location.origin + window.location.pathname;
+      var res = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectTo }
+      });
+      if (res && res.error) throw res.error;
+      // Browser is navigating to Google. Keep the button disabled.
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      showMsg('loginMsg', 'error', (err && err.message) || 'Google sign-in failed. Please try again.');
+    }
+  }
+
+  /* --------------------------------------------------------------------
+     Logout
+     -------------------------------------------------------------------- */
+  async function onLogoutClick() {
+    try { await sb.auth.signOut(); } catch (e) { /* ignore */ }
+    // onAuthStateChange will fire SIGNED_OUT and reset the UI.
+  }
+
+  /* --------------------------------------------------------------------
+     Admin check + form load
+     -------------------------------------------------------------------- */
+  async function isAdminRpc() {
+    try {
+      var res = await sb.rpc('is_admin');
+      if (res && res.error) return false;
+      return res && res.data === true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function loadRow() {
+    try {
+      var res = await sb
+        .from('brand_settings')
+        .select('tagline, about_title, about_text, instagram_url, facebook_url')
+        .eq('id', 1)
+        .maybeSingle();
+      if (res && res.error) return null;
+      return (res && res.data) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function fillForm(row) {
+    row = row || {};
+    $('fTagline').value    = row.tagline       || '';
+    $('fAboutTitle').value = row.about_title   || '';
+    $('fAboutText').value  = row.about_text    || '';
+    $('fIgUrl').value      = row.instagram_url || '';
+    $('fFbUrl').value      = row.facebook_url  || '';
+  }
+
+  /* --------------------------------------------------------------------
+     Save — upsert on id = 1, set updated_at
+     -------------------------------------------------------------------- */
+  async function onSave() {
+    var btn = $('saveBtn');
+    var original = btn ? btn.textContent : 'Save changes';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Saving…';
+    }
+    clearMsg('formMsg');
+
+    var payload = {
+      id: 1,
+      tagline:       String($('fTagline').value || '').trim(),
+      about_title:   String($('fAboutTitle').value || '').trim(),
+      about_text:    String($('fAboutText').value || '').trim(),
+      instagram_url: String($('fIgUrl').value || '').trim(),
+      facebook_url:  String($('fFbUrl').value || '').trim(),
+      updated_at:    new Date().toISOString()
+    };
+
+    try {
+      var res = await sb
+        .from('brand_settings')
+        .upsert(payload, { onConflict: 'id' });
+
+      if (res && res.error) throw res.error;
+
+      showMsg('formMsg', 'success', 'Saved successfully. The website is already updated.', 4000);
+    } catch (err) {
+      var msg = (err && (err.message || err.error_description)) || 'Could not save. Please try again.';
+      if (/permission|row-level security|not allowed|jwt/i.test(String(msg))) {
+        msg = 'You do not have admin access to save these details. Please log in with the admin Google account.';
+      }
+      showMsg('formMsg', 'error', msg);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    }
+  }
+
+  /* --------------------------------------------------------------------
+     Auth flow — decide which screen to show
+     -------------------------------------------------------------------- */
+  async function handleUser(user) {
+    if (!user) {
+      hide($('screenDenied'));
+      hide($('screenForm'));
+      showScreen('login');
+      return;
+    }
+
+    var admin = await isAdminRpc();
+    if (!admin) {
+      $('deniedEmail').textContent = 'Signed in as ' + (user.email || '—');
+      showScreen('denied');
+      return;
+    }
+
+    // Admin — fill the form and show it.
+    $('adminEmail').textContent = user.email || 'admin';
+    clearMsg('formMsg');
+
+    var row = await loadRow();
+    fillForm(row || {});
+    showScreen('form');
+  }
+
+  /* --------------------------------------------------------------------
+     Wire UI + boot
+     -------------------------------------------------------------------- */
+  function wire() {
+    var g = $('googleBtn');
+    if (g) g.addEventListener('click', onGoogleClick);
+
+    var dl = $('deniedLogoutBtn');
+    if (dl) dl.addEventListener('click', onLogoutClick);
+
+    var lb = $('logoutBtn');
+    if (lb) lb.addEventListener('click', onLogoutClick);
+
+    var sv = $('saveBtn');
+    if (sv) sv.addEventListener('click', onSave);
+
+    // Enter inside single-line fields should NOT submit the form (button is type=button),
+    // but let's prevent the implicit submit anyway.
+    var f = $('brandForm');
+    if (f) f.addEventListener('submit', function (e) { e.preventDefault(); });
+  }
+
+  async function boot() {
+    wire();
+
+    // Initial session (also handles the redirect back from Google).
+    try {
+      var s = await sb.auth.getSession();
+      var session = s && s.data ? s.data.session : null;
+      await handleUser(session ? session.user : null);
+    } catch (e) {
+      showScreen('login');
+    }
+
+    // React to every auth change from now on.
+    sb.auth.onAuthStateChange(function (event, session) {
+      // Defer slightly so supabase finishes its internal bookkeeping.
+      setTimeout(function () {
+        handleUser(session ? session.user : null).catch(function () {});
+      }, 0);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
+})();
+</script>
+
+</body>
+</html>
