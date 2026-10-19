@@ -19,16 +19,65 @@
 <!-- Site styles -->
 <link rel="stylesheet" href="css/style.css" />
 
-<!--
-  Layout note (CSS will handle the breakpoints):
-  PHONE + TABLET (<=1023px):
-     Row 1: hamburger LEFT | Viona logo CENTERED | Login/User RIGHT
-     Row 2: full-width search bar
-     Nav row hidden (replaced by the slide-in drawer #mobileMenu)
-  LAPTOP (>=1024px):
-     Logo left | horizontal menu centre | search + login right
-     No hamburger (drawer is unavailable on laptop)
--->
+<!-- Day 11 additions: brand tagline + About section + footer social icons -->
+<style>
+  /* Brand tagline under the hero heading */
+  .brand-tagline {
+    font-family: "Playfair Display", Georgia, serif;
+    font-style: italic;
+    font-size: clamp(14px, 1.8vw, 18px);
+    color: var(--gold-2, #E3C87F);
+    margin: 6px auto 18px;
+    letter-spacing: .04em;
+    max-width: 640px;
+    line-height: 1.55;
+    text-align: center;
+  }
+  @media (max-width: 600px) {
+    .brand-tagline { font-size: 14px; margin-bottom: 16px; padding: 0 8px; }
+  }
+
+  /* About section — preserve line breaks from the admin story text */
+  #aboutText {
+    white-space: pre-line;
+    color: var(--muted, #6E6A63);
+    font-size: 14.5px;
+    line-height: 1.9;
+    margin: 0;
+  }
+
+  /* Footer social icons — round gold buttons, hidden until a URL is set */
+  .footer-social {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .footer-social-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--gold-line, rgba(201,162,75,.55));
+    color: var(--gold-2, #E3C87F);
+    background: transparent;
+    transition: background .2s ease, transform .2s ease, border-color .2s ease;
+  }
+  .footer-social-link:hover {
+    background: rgba(201,162,75,.14);
+    border-color: var(--gold, #C9A24B);
+    transform: translateY(-2px);
+  }
+  .footer-social-link svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+  .footer-social-link[hidden] { display: none !important; }
+</style>
 </head>
 <body>
 
@@ -44,14 +93,13 @@
 <header class="site-header" id="siteHeader">
   <div class="header-inner" id="headerInner">
 
-    <!-- Hamburger (visible on phone + tablet; hidden on laptop).
-         Left side of the top row. Opens the slide-in drawer. -->
+    <!-- Hamburger (visible on phone + tablet; hidden on laptop) -->
     <button class="hamburger" id="menuToggle" type="button"
             aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
       <span></span><span></span><span></span>
     </button>
 
-    <!-- Brand / logo (centred on phone + tablet) -->
+    <!-- Brand / logo -->
     <a class="brand" href="#top" aria-label="Viona Bangles home">
       <img src="images/logo-gold.png"
            alt="Viona Bangles"
@@ -61,7 +109,7 @@
       <span class="brand-fallback" id="headerLogoFallback" hidden>Viona</span>
     </a>
 
-    <!-- Search bar (own row on phone + tablet, inline on laptop) -->
+    <!-- Search bar -->
     <div class="search-wrap" id="searchWrap">
       <form class="search-form" id="searchForm" role="search" autocomplete="off">
         <span class="search-icon" aria-hidden="true">
@@ -89,13 +137,10 @@
       <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
     </div>
 
-    <!-- Account / Login area (right side of the top row) -->
+    <!-- Account / Login area -->
     <div class="account-wrap" id="accountWrap">
-
-      <!-- Logged-out: small Login button -->
       <button type="button" class="login-btn" id="loginBtn">Login</button>
 
-      <!-- Logged-in: avatar + name with a small dropdown -->
       <div class="user-menu" id="userMenu" hidden>
         <button type="button" class="user-menu-btn" id="userMenuBtn"
                 aria-haspopup="true" aria-expanded="false">
@@ -107,11 +152,9 @@
           <button type="button" class="user-dropdown-item" id="logoutBtn">Logout</button>
         </div>
       </div>
-
     </div>
 
-    <!-- Navigation (LAPTOP ONLY — hidden up to 1023px via CSS).
-         On phone + tablet the same links live inside #mobileMenu. -->
+    <!-- Navigation (LAPTOP ONLY) -->
     <nav class="header-nav" id="headerNav" aria-label="Main navigation">
       <a href="#top" class="nav-link">Home</a>
       <a href="#collections" class="nav-link">Collections</a>
@@ -137,9 +180,7 @@
 </header>
 
 <!-- ==========================================================================
-     MOBILE DRAWER (phone + tablet, screen width up to 1023px)
-     Slide-in from the left. Navy background, gold links.
-     Opened by #menuToggle, closed by overlay / close button / link / Escape.
+     MOBILE DRAWER (phone + tablet, up to 1023px)
      ========================================================================== -->
 <div class="menu-overlay" id="menuOverlay" hidden></div>
 
@@ -201,6 +242,11 @@
 
       <p class="hero-label" id="heroLabel">Handcrafted in Gaya, Bihar</p>
       <h1 class="hero-heading" id="heroHeading">Timeless Bangles, Made for You</h1>
+
+      <!-- Brand tagline — filled from brand_settings by js/brand.js.
+           Default text stays if fetch fails so nothing looks broken. -->
+      <p class="brand-tagline" id="brandTagline">Where tradition meets timeless elegance — handcrafted, premium, and made for you.</p>
+
       <p class="hero-text" id="heroText">
         Premium glass and traditional bangles, handpicked for every occasion.
       </p>
@@ -224,7 +270,7 @@
   </section>
 
   <!-- ========================================================================
-       COLLECTIONS — category filter is the strip above; search is in header
+       COLLECTIONS
        ======================================================================== -->
   <section class="collections" id="collections">
     <div class="container">
@@ -246,11 +292,6 @@
         <div class="skeleton-card"></div>
       </div>
 
-      <!-- Empty state — text + reset button are set by JS depending on cause:
-           • No products at all    -> "No products available right now. Please check back soon."
-           • No match (with items) -> "No products found. Try another category or search."
-           • Supabase failed       -> "Could not load products. Please refresh the page."
-           The reset button is hidden when there are no products at all. -->
       <div class="empty-box" id="emptyBox" hidden>
         <div class="empty-mark" aria-hidden="true">✦</div>
         <p class="empty-title" id="emptyTitle">No products found</p>
@@ -262,7 +303,7 @@
   </section>
 
   <!-- ========================================================================
-       ABOUT
+       ABOUT — brand story pulled from public.brand_settings (by js/brand.js)
        ======================================================================== -->
   <section class="about" id="about">
     <div class="container about-inner">
@@ -280,12 +321,9 @@
 
       <div class="about-text">
         <p class="section-label">Our Story</p>
-        <h2 class="section-title" id="aboutHeading">About Viona Bangles</h2>
+        <h2 class="section-title" id="aboutTitle">The Viona Story</h2>
         <div class="gold-rule" aria-hidden="true"></div>
-        <p class="about-paragraph" id="aboutText">
-          Viona Bangles is a small family workshop in Gaya, Bihar. Every bangle is
-          finished by hand and checked before it is packed for you.
-        </p>
+        <p class="about-paragraph" id="aboutText">Viona Bangles is a small family workshop in Gaya, Bihar. Every bangle is finished by hand and checked with care before it is packed for you.</p>
         <ul class="about-points" id="aboutPoints"></ul>
       </div>
 
@@ -375,6 +413,25 @@
       <span class="brand-fallback" id="footerLogoFallback" hidden>Viona</span>
       <p class="footer-tagline">ELEGANT BANGLES</p>
       <p class="footer-sub">Made for You</p>
+
+      <!-- Footer social icons — set by js/brand.js. Hidden when the URL is empty. -->
+      <div class="footer-social" id="footerSocial">
+        <a class="footer-social-link" id="igLink" href="#" target="_blank" rel="noopener"
+           aria-label="Instagram" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect>
+            <circle cx="12" cy="12" r="4"></circle>
+            <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"></circle>
+          </svg>
+        </a>
+        <a class="footer-social-link" id="fbLink" href="#" target="_blank" rel="noopener"
+           aria-label="Facebook" hidden>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 4v2.2H8v3h2.5V21h3z"/>
+          </svg>
+        </a>
+      </div>
     </div>
 
     <div class="footer-col">
@@ -424,7 +481,6 @@
 
     <div class="modal-body">
 
-      <!-- LEFT: gallery -->
       <div class="modal-gallery">
         <div class="gallery-main">
           <img id="galleryMainImg" src="" alt="" />
@@ -434,7 +490,6 @@
         <div class="gallery-thumbs" id="galleryThumbs"></div>
       </div>
 
-      <!-- RIGHT: info + tabs -->
       <div class="modal-info">
 
         <p class="modal-code" id="modalCode"></p>
@@ -539,127 +594,6 @@
 </div>
 
 <!-- ==========================================================================
-     LOGIN MODAL
-     Contains: login form, signup form, forgot-password form.
-     Required IDs: loginBtn (header), forgotLink, forgotForm, forgotEmail,
-     forgotSendBtn, forgotBackLink, authMessage.
-     ========================================================================== -->
-<div class="auth-modal" id="loginModal" hidden>
-  <div class="auth-backdrop" data-auth-close></div>
-
-  <div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
-    <button type="button" class="auth-close" id="loginCloseBtn" aria-label="Close login">×</button>
-
-    <div class="auth-brand">Viona</div>
-    <h2 class="auth-title" id="loginModalTitle">Welcome</h2>
-    <p class="auth-sub" id="loginSub">Login or create an account to continue.</p>
-
-    <!-- Shared message area (used by login, signup and forgot flows) -->
-    <p class="auth-message" id="authMessage" role="alert" hidden></p>
-
-    <!-- Google sign-in -->
-    <button type="button" class="auth-google" id="googleLoginBtn">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/>
-        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.3 26.7 36 24 36c-5.2 0-9.6-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.2C36.9 40.3 44 35 44 24c0-1.2-.1-2.4-.4-3.5z"/>
-      </svg>
-      <span>Continue with Google</span>
-    </button>
-
-    <div class="auth-or"><span>or</span></div>
-
-    <!-- Login form -->
-    <form class="auth-form" id="loginForm" novalidate>
-      <label class="auth-field">
-        <span>Email</span>
-        <input type="email" id="loginEmail" autocomplete="email" required />
-      </label>
-      <label class="auth-field">
-        <span>Password</span>
-        <input type="password" id="loginPassword" autocomplete="current-password" required />
-      </label>
-
-      <!-- Forgot password link — sits right below the password field -->
-      <div class="auth-forgot-row">
-        <button type="button" class="auth-forgot-link" id="forgotLink">Forgot password?</button>
-      </div>
-
-      <button type="submit" class="auth-submit" id="loginSubmitBtn">Login</button>
-
-      <p class="auth-switch">
-        New here?
-        <button type="button" class="auth-switch-link" id="showSignupBtn">Create an account</button>
-      </p>
-    </form>
-
-    <!-- Signup form (hidden by default) -->
-    <form class="auth-form" id="signupForm" hidden novalidate>
-      <label class="auth-field">
-        <span>Full name</span>
-        <input type="text" id="signupName" autocomplete="name" required />
-      </label>
-      <label class="auth-field">
-        <span>Email</span>
-        <input type="email" id="signupEmail" autocomplete="email" required />
-      </label>
-      <label class="auth-field">
-        <span>Password</span>
-        <input type="password" id="signupPassword" autocomplete="new-password" minlength="6" required />
-      </label>
-      <button type="submit" class="auth-submit" id="signupSubmitBtn">Create account</button>
-      <p class="auth-switch">
-        Already have an account?
-        <button type="button" class="auth-switch-link" id="showLoginBtn">Login</button>
-      </p>
-    </form>
-
-    <!-- Forgot password form (hidden by default) -->
-    <form class="auth-form" id="forgotForm" hidden novalidate>
-      <p class="auth-sub">Enter your email and we will send a password reset link.</p>
-      <label class="auth-field">
-        <span>Email</span>
-        <input type="email" id="forgotEmail" autocomplete="email" required />
-      </label>
-      <button type="button" class="auth-submit" id="forgotSendBtn">Send reset link</button>
-      <button type="button" class="auth-back-link" id="forgotBackLink">Back to login</button>
-    </form>
-  </div>
-</div>
-
-<!-- ==========================================================================
-     RESET PASSWORD MODAL — stays hidden by default.
-     Shown after the user clicks the reset link in their email.
-     Required IDs: resetModal, newPassword, confirmPassword, updatePasswordBtn.
-     ========================================================================== -->
-<div class="auth-modal" id="resetModal" hidden>
-  <div class="auth-backdrop" data-auth-close></div>
-
-  <div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
-    <button type="button" class="auth-close" id="resetCloseBtn" aria-label="Close">×</button>
-
-    <div class="auth-brand">Viona</div>
-    <h2 class="auth-title" id="resetModalTitle">Set a new password</h2>
-    <p class="auth-sub">Choose a new password (at least 6 characters).</p>
-
-    <p class="auth-message" id="resetMessage" role="alert" hidden></p>
-
-    <form class="auth-form" id="resetForm" novalidate>
-      <label class="auth-field">
-        <span>New password</span>
-        <input type="password" id="newPassword" autocomplete="new-password" minlength="6" required />
-      </label>
-      <label class="auth-field">
-        <span>Confirm new password</span>
-        <input type="password" id="confirmPassword" autocomplete="new-password" minlength="6" required />
-      </label>
-      <button type="button" class="auth-submit" id="updatePasswordBtn">Update password</button>
-    </form>
-  </div>
-</div>
-
-<!-- ==========================================================================
      POPUP MESSAGE ROOT (filled by JS only when an active popup exists)
      ========================================================================== -->
 <div id="popupRoot" class="popup-root"></div>
@@ -671,11 +605,14 @@
 
 <!-- ==========================================================================
      SCRIPTS
+     Order matters: supabase CDN -> config -> auth (builds its own modals) ->
+     script (products/reviews) -> brand (About / tagline / social).
      ========================================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/script.js"></script>
+<script src="js/brand.js"></script>
 
 </body>
 </html>
