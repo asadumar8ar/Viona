@@ -1,49 +1,56 @@
 /* ============================================================================
-   Viona Bangles — js/script.js
+   Viona Bangles — js/script.js  (Day 12, Part 5)
    ----------------------------------------------------------------------------
    Public homepage logic. Plain vanilla JS, no build step.
 
    Uses:
      - window.VIONA_CONFIG  (js/config.js)
      - window.VionaAuth     (js/auth.js)  -> auth + login modal + profile
+     - window.siteText / window.SITE_CONTENT (js/brand.js, Day 12)
      - supabase-js v2       (CDN global "supabase")
 
    What it does:
      - Loads products + site_settings from Supabase (defensive: learns columns
-       by doing select * limit 1).
-     - Products come ONLY from the Supabase `products` table, showing only rows
-       where is_active is not false. There is NO demo/sample data anywhere.
+       by doing select * limit 1). No demo data anywhere.
      - Header search + suggestions, category strip, product grid.
      - Product modal with gallery, size chips, WhatsApp order button.
      - Offers banner from site_settings (hidden when empty).
      - Reviews: fetched once, grouped by product_id, shown per product.
      - Review form wired to VionaAuth (login required).
-     - Mobile slide-in drawer (#mobileMenu) with overlay / close / Escape.
+     - Mobile slide-in drawer (#mobileMenu).
      - Injects its own CSS so css/style.css does not need to change.
 
-   REVIEW BAR FIX (this revision):
-     - Rating is now read from r.rating OR r.stars (whichever exists), rounded
-       to an integer 1-5, invalid values are ignored. Fixes bars not matching.
-     - reviews select uses '*' so no column-not-found errors when the schema
-       uses `stars` instead of `rating`.
-     - When the current product has 0 reviews, the bars area is cleared
-       (no 0-width bars, no NaN, no 0/0). "No reviews yet" is shown instead.
-     - Summary and bars are re-rendered on every product switch and right
-       after a new review is submitted, so old product numbers never stay.
-     - Average star row already supports half-stars via a percentage-width
-       overlay (gold fg on grey bg) — unchanged but verified.
+   DAY 12 (TASK 2) — Product sizes on the details view:
+     - Master list comes from site_content.all_sizes (fallback "2.2, 2.4, 2.6, 2.8").
+     - A size is AVAILABLE if it's inside the product's `sizes` column
+       (parsed from array or text with commas / slashes / spaces, compared
+       numerically so "2.4" === "2.40"). Available chips are normal and
+       selectable — the selected size still flows into the WhatsApp order
+       message exactly as before.
+     - Sizes NOT in the product's sizes are UNAVAILABLE: dimmed grey, no
+       hover, cursor not-allowed. Clicking one opens a premium navy + gold
+       popup with size_unavailable_title / size_unavailable_message
+       (prefixed with "Size X") / size_unavailable_button. It never selects
+       the size.
+     - If a product has no sizes value at all → the size section is hidden.
+     - If the product is out_of_stock → all chips are disabled (existing
+       behaviour), no popup is shown when clicking them.
 
-   Earlier fixes (kept in place):
-     - C1: site_settings offer flag reads EITHER `offer_active` OR
-       `offer_enabled` (whichever exists), so admin changes propagate to the
-       public strip / banner regardless of which key was saved.
-     - C2: `sizes` column is parsed as JSON first (JSON array string), then
-       as an array, then finally as a comma-separated string.
-     - M2: `offer_link` is loaded from site_settings so the "Shop now"
-       button can render. Empty link hides the button.
-     - M4: `sizes` only falls back to ['2.2','2.4','2.6','2.8'] when the raw
-       value is null/undefined. Empty array (or empty string) stays empty,
-       and the modal sizes section hides itself.
+   DAY 12 — editable strings:
+     - Empty products message, order button label, size popup title/message/
+       button, and any other string the script generates now reads
+       window.siteText('key', 'fallback').
+     - Re-renders those strings when the "siteContentLoaded" event fires
+       (so brand.js loading late doesn't leave stale text in the UI).
+
+   Earlier fixes retained:
+     - C1: offer flag read from offer_active OR offer_enabled.
+     - C2: sizes parsed JSON → array → CSV.
+     - M2: offer_link used for "Shop now", hidden if empty.
+     - M4: sizes default only when null/undefined.
+     - Review bars: count from the currently-open product's reviews only,
+       readRatingValue() handles rating/stars, no bars when total = 0,
+       bars re-render on product switch and after submit.
    ============================================================================ */
 
 (function () {
@@ -58,7 +65,7 @@
   var SUPABASE_READY = false;
 
   var REVIEW_BUCKET = 'review-images';
-  var REVIEW_MAX_BYTES = 2 * 1024 * 1024;   // 2 MB
+  var REVIEW_MAX_BYTES = 2 * 1024 * 1024;
   var REVIEW_MAX_WIDTH = 1200;
 
   function isPlaceholder(v) {
@@ -88,6 +95,15 @@
       .replace(/'/g, '&#39;');
   }
   function escAttr(s) { return esc(s); }
+
+  /* siteText wrapper — safe when brand.js is not loaded. */
+  function t(key, fallback) {
+    if (window.siteText && typeof window.siteText === 'function') {
+      var v = window.siteText(key, fallback);
+      return (v == null || v === '') ? (fallback == null ? '' : fallback) : v;
+    }
+    return fallback == null ? '' : fallback;
+  }
 
   function waLink(number, message) {
     var n = String(number || '').replace(/[^0-9]/g, '');
@@ -142,26 +158,26 @@
   }
 
   function debounce(fn, ms) {
-    var t = null;
+    var tmr = null;
     return function () {
       var args = arguments, self = this;
-      clearTimeout(t);
-      t = setTimeout(function () { fn.apply(self, args); }, ms);
+      clearTimeout(tmr);
+      tmr = setTimeout(function () { fn.apply(self, args); }, ms);
     };
   }
 
   var toastTimer = null;
   function toast(msg) {
-    var t = el('toast');
-    if (!t) return;
-    t.textContent = String(msg || '');
-    t.hidden = false;
-    void t.offsetWidth;
-    t.classList.add('is-visible');
+    var node = el('toast');
+    if (!node) return;
+    node.textContent = String(msg || '');
+    node.hidden = false;
+    void node.offsetWidth;
+    node.classList.add('is-visible');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () {
-      t.classList.remove('is-visible');
-      setTimeout(function () { t.hidden = true; }, 300);
+      node.classList.remove('is-visible');
+      setTimeout(function () { node.hidden = true; }, 300);
     }, 3000);
   }
 
@@ -180,12 +196,7 @@
     console.error('[viona] ' + where, err);
   }
 
-  /* --------------------------------------------------------------------
-     readRatingValue — safe integer 1..5 from a review row.
-     Reads r.rating first, then r.stars (whichever exists). Invalid
-     values (null, undefined, '', NaN, <1, >5) return 0 and are ignored
-     by the caller. This is the FIX for the review bar mismatch.
-     -------------------------------------------------------------------- */
+  /* Read a rating from a review row — supports r.rating or r.stars. */
   function readRatingValue(r) {
     if (!r) return 0;
     var raw = r.rating;
@@ -199,7 +210,77 @@
   }
 
   /* ==========================================================================
-     3. STATE
+     3. SIZE HELPERS (Day 12 TASK 2)
+     ========================================================================== */
+
+  /* Parse a sizes value into an array of trimmed strings.
+     Handles arrays, CSV, slashes and whitespace: "2.4, 2.6" / "2.4/2.6" / ["2.4","2.6"]. */
+  function parseSizeList(raw) {
+    if (raw == null) return [];
+    if (Array.isArray(raw)) {
+      return raw.map(function (s) { return String(s).trim(); }).filter(Boolean);
+    }
+    var str = String(raw).trim();
+    if (!str) return [];
+    return str.split(/[,\/\s]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  /* Normalised numeric key so "2.4" === "2.40" === "2.40" (case-folded for word sizes). */
+  function sizeKey(s) {
+    var n = parseFloat(s);
+    if (isFinite(n)) return 'n:' + n.toFixed(3);
+    return 's:' + String(s).trim().toLowerCase();
+  }
+
+  /* Master list from site_content.all_sizes (falls back to a sensible default). */
+  function getMasterSizes() {
+    var raw = t('all_sizes', '2.2, 2.4, 2.6, 2.8');
+    var list = parseSizeList(raw);
+    if (!list.length) list = ['2.2', '2.4', '2.6', '2.8'];
+    return list;
+  }
+
+  /* The sizes a specific product has (numeric-key comparison later). */
+  function getProductSizeValues(p) {
+    if (!p) return [];
+    return parseSizeList(p.sizes);
+  }
+
+  /* Build the full ordered list of chips for a product:
+       { label, available }
+     - Available sizes come from the product's `sizes` field.
+     - Master sizes that aren't in the product are UNAVAILABLE.
+     - Extra product sizes not in the master are appended (always available). */
+  function buildSizeChips(p) {
+    var productRaw = getProductSizeValues(p);
+    if (!productRaw.length) return null;   // no sizes → hide section
+
+    var availableSet = {};
+    productRaw.forEach(function (s) { availableSet[sizeKey(s)] = String(s); });
+
+    var master = getMasterSizes();
+    var seen = {};
+    var out = [];
+
+    master.forEach(function (s) {
+      var k = sizeKey(s);
+      if (seen[k]) return;
+      seen[k] = true;
+      out.push({ label: String(s), available: !!availableSet[k] });
+    });
+
+    productRaw.forEach(function (s) {
+      var k = sizeKey(s);
+      if (seen[k]) return;
+      seen[k] = true;
+      out.push({ label: String(s), available: true });
+    });
+
+    return out;
+  }
+
+  /* ==========================================================================
+     4. STATE
      ========================================================================== */
 
   var state = {
@@ -245,28 +326,26 @@
   };
 
   /* ==========================================================================
-     4. INJECTED STYLES
+     5. INJECTED STYLES
      ========================================================================== */
 
   function injectStyles() {
     if (el('vionaRuntimeStyles')) return;
 
     var css = [
-      /* ---------- fractional star row ---------- */
+      /* star rows */
       '.vrt-stars{display:inline-flex;position:relative;line-height:1;',
       'font-size:15px;letter-spacing:2px;vertical-align:middle;}',
       '.vrt-stars-bg{color:#E4DFD3;}',
       '.vrt-stars-fg{position:absolute;top:0;left:0;overflow:hidden;',
       'white-space:nowrap;color:#C9A24B;pointer-events:none;}',
 
-      /* ---------- small rating pill on cards ---------- */
       '.vrt-card-rating{display:flex;align-items:center;gap:6px;margin:6px 0 0;',
       'font-size:12.5px;color:#4A5568;}',
       '.vrt-card-rating .vrt-avg{font-weight:700;color:#0B1F3A;}',
       '.vrt-card-rating .vrt-total{color:#6B7280;}',
       '.vrt-card-rating .vrt-noreviews{color:#9AA1AE;font-style:italic;}',
 
-      /* ---------- summary box ---------- */
       '.vrt-summary{display:grid;grid-template-columns:150px 1fr;gap:22px;',
       'background:#FAF7F0;border:1px solid #ECE6DA;border-radius:14px;',
       'padding:18px 20px;margin:6px 0 22px;align-items:center;}',
@@ -277,7 +356,6 @@
       '.vrt-count{display:block;font-size:12.5px;color:#6B7280;margin-top:8px;}',
       '.vrt-summary-right{display:flex;flex-direction:column;gap:7px;}',
 
-      /* ---------- bar rows (used by renderReviewSummary) ---------- */
       '.vrt-bar-row{display:grid;grid-template-columns:38px 1fr 32px;',
       'gap:10px;align-items:center;font-size:12.5px;color:#4A5568;}',
       '.vrt-bar-label{font-weight:600;color:#0B1F3A;white-space:nowrap;}',
@@ -287,10 +365,8 @@
       'background:#C9A24B;border-radius:999px;',
       'transition:width .55s cubic-bezier(.2,.7,.2,1);}',
       '.vrt-bar-count{text-align:right;color:#6B7280;font-variant-numeric:tabular-nums;}',
-      '.vrt-bars-empty{font-size:13px;color:#6B7280;font-style:italic;',
-      'text-align:center;padding:8px 0;}',
 
-      /* ---------- reviews list ---------- */
+      /* reviews list */
       '.vrt-rv{padding:16px 0;border-bottom:1px solid #ECE6DA;}',
       '.vrt-rv:last-child{border-bottom:none;}',
       '.vrt-rv-top{display:flex;align-items:center;gap:12px;margin-bottom:8px;}',
@@ -319,7 +395,7 @@
       '.vrt-rv-act.danger{color:#B42318;border-color:#F2C6C2;}',
       '.vrt-rv-act.danger:hover{background:#FDF2F1;}',
 
-      /* ---------- review form ---------- */
+      /* review form */
       '.vrt-form{background:#fff;border:1px solid #ECE6DA;border-radius:14px;',
       'padding:18px 20px;margin-top:16px;}',
       '.vrt-form-title{font-size:16px;font-weight:700;margin:0 0 4px;color:#0B1F3A;}',
@@ -339,14 +415,12 @@
       '.vrt-cta-title{font-size:16px;font-weight:700;margin:0 0 4px;color:#0B1F3A;}',
       '.vrt-cta-text{font-size:13px;color:#6B7280;margin:0 0 14px;}',
 
-      /* ---------- star picker ---------- */
       '.vrt-picker{display:inline-flex;gap:2px;font-size:30px;line-height:1;}',
       '.vrt-pick{background:none;border:none;padding:0 2px;cursor:pointer;',
       'color:#E4DFD3;font-size:30px;line-height:1;font-family:inherit;}',
       '.vrt-pick.is-on{color:#C9A24B;}',
       '.vrt-pick:hover{color:#C9A24B;}',
 
-      /* ---------- photo picker ---------- */
       '.vrt-photos{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}',
       '.vrt-photo{position:relative;width:88px;height:88px;border-radius:10px;',
       'overflow:hidden;background:#F1EDE4;border:1px solid #E4DED2;}',
@@ -360,7 +434,6 @@
       'font-size:26px;cursor:pointer;}',
       '.vrt-photo-add:hover{border-color:#C9A24B;color:#C9A24B;}',
 
-      /* ---------- buttons ---------- */
       '.vrt-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;',
       'border:1px solid transparent;border-radius:10px;padding:10px 16px;',
       'font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;',
@@ -371,7 +444,7 @@
       '.vrt-btn-ghost{background:#fff;border-color:#E4DED2;color:#0B1F3A;}',
       '.vrt-btn-ghost:hover:not(:disabled){border-color:#C9A24B;}',
 
-      /* ---------- STOCK: card visuals ---------- */
+      /* stock visuals */
       '.card-media.is-out{background:#F1EDE4;}',
       '.card-media.is-out .card-img{opacity:.4;filter:grayscale(.4);}',
       '.card-media.is-out .card-placeholder{opacity:.5;}',
@@ -388,7 +461,6 @@
       'color:#8A5A00;background:#FFF4E0;',
       'border:1px solid #F0D9A6;border-radius:999px;padding:3px 10px;}',
 
-      /* ---------- STOCK: modal visuals ---------- */
       '.modal-lowstock{margin:0 0 10px;padding:8px 12px;border-radius:8px;',
       'font-size:13px;font-weight:600;text-align:center;',
       'color:#8A5A00;background:#FFF4E0;border:1px solid #F0D9A6;}',
@@ -405,10 +477,48 @@
       '.size-chip.is-disabled,.size-chip[disabled]{opacity:.45;',
       'cursor:not-allowed;pointer-events:none;}',
 
-      /* ---------- mobile ---------- */
+      /* DAY 12 — dimmed "size not available" chips.
+         Clickable so they can open the popup; looks dim, no hover lift. */
+      '.size-chip.is-unavailable{opacity:.45;background:#EFEAE0;',
+      'color:#8A8F98;border-color:#E4DED2;cursor:not-allowed;}',
+      '.size-chip.is-unavailable:hover{border-color:#E4DED2;',
+      'background:#EFEAE0;color:#8A8F98;}',
+      '.size-chip.is-unavailable.is-active{background:#EFEAE0;',
+      'color:#8A8F98;border-color:#E4DED2;}',
+
+      /* SIZE POPUP — navy + gold, centered */
+      '#sizePopup.popup-overlay{position:fixed;inset:0;z-index:1100;',
+      'display:grid;place-items:center;padding:20px;}',
+      '#sizePopup .popup-backdrop{position:absolute;inset:0;',
+      'background:rgba(5,10,20,.78);backdrop-filter:blur(3px);',
+      '-webkit-backdrop-filter:blur(3px);animation:fadeIn .2s ease;}',
+      '#sizePopup .size-popup-card{position:relative;z-index:2;',
+      'width:100%;max-width:400px;border-radius:18px;overflow:hidden;',
+      'background:linear-gradient(180deg,#0B1F3A 0%,#081428 100%);',
+      'border-top:3px solid #C9A24B;color:#fff;',
+      'box-shadow:0 24px 60px rgba(0,0,0,.5);',
+      'animation:popIn .25s ease;}',
+      '#sizePopup .popup-inner{padding:32px 26px 26px;text-align:center;}',
+      '#sizePopup .popup-title{color:#E3C87F;',
+      'font-family:"Playfair Display",Georgia,serif;',
+      'font-size:22px;font-weight:600;margin:0 0 10px;line-height:1.3;}',
+      '#sizePopup .popup-subtitle{color:rgba(255,255,255,.86);',
+      'white-space:pre-line;font-size:14px;line-height:1.6;margin:0 0 22px;}',
+      '#sizePopup .popup-btn{display:inline-block;padding:11px 28px;',
+      'border-radius:999px;border:0;',
+      'background:linear-gradient(180deg,#D4AF63 0%,#C9A24B 100%);',
+      'color:#0B1F3A;font-family:inherit;font-size:13px;font-weight:600;',
+      'letter-spacing:.08em;text-transform:uppercase;cursor:pointer;',
+      'box-shadow:0 8px 22px rgba(201,162,75,.4);',
+      'transition:filter .15s ease,transform .15s ease;}',
+      '#sizePopup .popup-btn:hover{filter:brightness(1.06);}',
+      '#sizePopup .popup-btn:active{transform:translateY(1px);}',
+
       '@media (max-width:600px){',
       '.vrt-summary{grid-template-columns:1fr;gap:16px;text-align:center;}',
       '.vrt-summary-right{text-align:left;}',
+      '#sizePopup .popup-inner{padding:28px 20px 22px;}',
+      '#sizePopup .popup-title{font-size:20px;}',
       '}'
     ].join('');
 
@@ -419,7 +529,7 @@
   }
 
   /* ==========================================================================
-     5. LOAD SITE SETTINGS
+     6. LOAD SITE SETTINGS
      ========================================================================== */
 
   async function loadSettings() {
@@ -526,22 +636,33 @@
     var b = s.business || {};
     var h = s.hero || {};
     var a = s.about || {};
-    var t = s.trust || {};
+    var t2 = s.trust || {};
     var soc = s.social || {};
 
     var waNum = b.whatsapp || CFG.WHATSAPP_NUMBER || '';
     var waMsg = 'Hello Viona Bangles, I would like to know more about your bangles.';
 
-    var heroLabel = el('heroLabel');   if (heroLabel) heroLabel.textContent = h.label || '';
-    var heroHead  = el('heroHeading'); if (heroHead)  heroHead.textContent  = h.heading || '';
-    var heroText  = el('heroText');    if (heroText)  heroText.textContent  = h.text || '';
+    /* Only fill hero/about fields if the site_content has not provided a
+       value — otherwise we would overwrite the editable data from brand.js. */
+    function setIfEmpty(id, value) {
+      var node = el(id);
+      if (!node) return;
+      if (node.getAttribute('data-content')) return; // brand.js handles it
+      if (!node.textContent || !node.textContent.trim()) {
+        if (value) node.textContent = value;
+      }
+    }
 
-    var aboutHead = el('aboutHeading'); if (aboutHead) aboutHead.textContent = a.heading || '';
-    var aboutText = el('aboutText');    if (aboutText) aboutText.textContent = a.text || '';
+    setIfEmpty('heroLabel', h.label);
+    setIfEmpty('heroHeading', h.heading);
+    setIfEmpty('heroText', h.text);
+
+    setIfEmpty('aboutHeading', a.heading);
+    setIfEmpty('aboutText', a.text);
 
     var aboutPoints = el('aboutPoints');
-    if (aboutPoints) {
-      var pts = Array.isArray(t.points) ? t.points : [];
+    if (aboutPoints && !aboutPoints.getAttribute('data-content')) {
+      var pts = Array.isArray(t2.points) ? t2.points : [];
       var pptHtml = '';
       pts.forEach(function (p) { if (p) pptHtml += '<li>' + esc(p) + '</li>'; });
       aboutPoints.innerHTML = pptHtml;
@@ -550,7 +671,7 @@
     var trustSection = el('trustSection');
     var trustList = el('trustList');
     if (trustSection && trustList) {
-      var trustPts = Array.isArray(t.points) ? t.points : [];
+      var trustPts = Array.isArray(t2.points) ? t2.points : [];
       var trustHtml = '';
       trustPts.forEach(function (p) {
         if (!p) return;
@@ -564,8 +685,10 @@
       }
     }
 
-    var cCity  = el('contactCity');  if (cCity)  cCity.textContent  = b.city || CFG.CITY || '';
-    var cHours = el('contactHours'); if (cHours) cHours.textContent = b.hours || CFG.HOURS || '';
+    var cCity  = el('contactCity');
+    if (cCity && !cCity.getAttribute('data-content')) cCity.textContent = b.city || CFG.CITY || '';
+    var cHours = el('contactHours');
+    if (cHours && !cHours.getAttribute('data-content')) cHours.textContent = b.hours || CFG.HOURS || '';
 
     var cEmail = el('contactEmail');
     if (cEmail) {
@@ -575,13 +698,15 @@
     }
 
     var cPhone = el('contactPhone');
-    if (cPhone) {
+    if (cPhone && !cPhone.getAttribute('data-content')) {
       cPhone.textContent = '+' + String(waNum).replace(/^\+/, '');
       cPhone.href = waLink(waNum, waMsg);
     }
 
-    var fCity  = el('footerCity');  if (fCity)  fCity.textContent  = b.city || CFG.CITY || '';
-    var fHours = el('footerHours'); if (fHours) fHours.textContent = b.hours || CFG.HOURS || '';
+    var fCity = el('footerCity');
+    if (fCity && !fCity.getAttribute('data-content')) fCity.textContent = b.city || CFG.CITY || '';
+    var fHours = el('footerHours');
+    if (fHours && !fHours.getAttribute('data-content')) fHours.textContent = b.hours || CFG.HOURS || '';
 
     var fEmail = el('footerEmail');
     if (fEmail) {
@@ -606,11 +731,11 @@
     }
 
     var y = el('footerYear');
-    if (y) y.textContent = String(new Date().getFullYear());
+    if (y && !y.parentNode.getAttribute('data-content')) y.textContent = String(new Date().getFullYear());
   }
 
   /* ==========================================================================
-     6. PRODUCTS — column detection + load
+     7. PRODUCTS — column detection + load
      ========================================================================== */
 
   async function detectProductColumns() {
@@ -628,20 +753,11 @@
     if (!state.productCols) {
       state.R = {
         known: false,
-        id: 'id',
-        name: 'name',
-        price: 'price',
-        old_price: 'old_price',
-        category: 'category',
-        sizes: 'sizes',
-        description: 'description',
-        main_image: 'main_image',
-        additional_images: 'additional_images',
-        code: 'code',
-        featured: 'featured',
-        is_active: 'is_active',
-        stock_status: 'stock_status',
-        created_at: 'created_at'
+        id: 'id', name: 'name', price: 'price', old_price: 'old_price',
+        category: 'category', sizes: 'sizes', description: 'description',
+        main_image: 'main_image', additional_images: 'additional_images',
+        code: 'code', featured: 'featured', is_active: 'is_active',
+        stock_status: 'stock_status', created_at: 'created_at'
       };
       return state.R;
     }
@@ -740,11 +856,11 @@
     if (isNaN(oldPrice) || oldPrice <= 0) oldPrice = null;
     if (oldPrice != null && !(oldPrice > price)) oldPrice = null;
 
-    // Sizes — JSON first, then array, then CSV. Default only when null.
+    /* Sizes — JSON first, then array, then CSV. Default only when null. */
     var sizesRaw = (R.sizes && row[R.sizes] != null) ? row[R.sizes] : row.sizes;
     var sizes;
     if (sizesRaw === null || sizesRaw === undefined) {
-      sizes = ['2.2','2.4','2.6','2.8'];
+      sizes = [];
     } else if (Array.isArray(sizesRaw)) {
       sizes = sizesRaw.map(String);
     } else if (typeof sizesRaw === 'string') {
@@ -768,7 +884,7 @@
     }
 
     var desc = (R.description && row[R.description] != null) ? String(row[R.description]) : String(row.description || '');
-    var mainImage = (R.main_image && row[R.main_image] != null) ? String(row[R.main_image]) : String(row.main_image || '');
+    var mainImage = (R.main_image && row[R.main_image] != null) ? String(row[R.main_image]) : String(row[R.main_image] || '');
 
     var more = [];
     var moreRaw = (R.additional_images && row[R.additional_images] != null)
@@ -816,7 +932,7 @@
   }
 
   /* ==========================================================================
-     7. CATEGORY STRIP
+     8. CATEGORY STRIP
      ========================================================================== */
 
   function buildCategories() {
@@ -852,11 +968,9 @@
   }
 
   /* ==========================================================================
-     8. REVIEWS — fetch once, group by product_id
+     9. REVIEWS — fetch once, group by product_id
      ========================================================================== */
 
-  /* Recompute fresh from the currently-open product's reviews.
-     readRatingValue() handles r.rating vs r.stars and invalid values. */
   function reviewStatsFor(productId) {
     var key = String(productId);
     var list = state.reviewsByProduct[key] || [];
@@ -885,7 +999,6 @@
     if (!SUPABASE_READY || !sb) return;
 
     try {
-      // '*' so no column-not-found errors if the schema has `stars` not `rating`.
       var res = await sb
         .from('reviews')
         .select('*')
@@ -922,8 +1035,6 @@
     return null;
   }
 
-  /* Fractional star row — gold fg on grey bg, width = average/5 %.
-     Gives the Amazon/Flipkart half-star look for any average value. */
   function starsRowHtml(average, size) {
     var av = Number(average) || 0;
     if (av < 0) av = 0;
@@ -948,7 +1059,7 @@
   }
 
   /* ==========================================================================
-     9. PRODUCT GRID + EMPTY STATES
+     10. PRODUCT GRID + EMPTY STATES
      ========================================================================== */
 
   function applyFilters() {
@@ -959,10 +1070,8 @@
       if (cat !== 'All' && p.category !== cat) return false;
       if (!term) return true;
       var hay = (
-        p.name + ' ' +
-        p.category + ' ' +
-        (p.description || '') + ' ' +
-        productCode(p.id, p.code)
+        p.name + ' ' + p.category + ' ' +
+        (p.description || '') + ' ' + productCode(p.id, p.code)
       ).toLowerCase();
       return hay.indexOf(term) !== -1;
     });
@@ -1009,7 +1118,9 @@
         if (state.loadError) {
           setEmptyState('Could not load products.', 'Please refresh the page.', false);
         } else if (!hasProducts) {
-          setEmptyState('No products available right now.', 'Please check back soon.', false);
+          var emptyMsg = t('empty_products_message',
+            'No products available right now. Please check back soon.');
+          setEmptyState('Nothing to show yet', emptyMsg, false);
         } else {
           setEmptyState('No products found.', 'Try another category or search.', true);
         }
@@ -1100,7 +1211,7 @@
   }
 
   /* ==========================================================================
-     10. SEARCH + LIVE SUGGESTIONS
+     11. SEARCH + LIVE SUGGESTIONS
      ========================================================================== */
 
   function setupSearch() {
@@ -1273,7 +1384,7 @@
   }
 
   /* ==========================================================================
-     11. PRODUCT MODAL
+     12. PRODUCT MODAL
      ========================================================================== */
 
   var lastFocusedBeforeModal = null;
@@ -1314,7 +1425,6 @@
     renderDetailRows(product);
     switchTab('details');
 
-    // Fresh render for THIS product only — no stale numbers from a previous one.
     renderModalRatingBadge();
     renderReviewSummary();
     renderReviewList();
@@ -1340,6 +1450,7 @@
     modal.hidden = true;
     document.body.classList.remove('no-scroll');
     state.currentProduct = null;
+    closeSizePopup();
 
     try {
       if (window.location.hash && window.location.hash.indexOf('#product=') === 0) {
@@ -1440,56 +1551,149 @@
     }
   }
 
+  /* --------------------------------------------------------------------------
+     renderSizes — DAY 12 TASK 2
+     Builds chips from master list (site_content.all_sizes) + product sizes.
+     Available sizes are selectable and flow into the WhatsApp message.
+     Unavailable sizes are dimmed; clicking one opens the premium popup.
+     Product with NO sizes → section hidden.
+     Product out_of_stock → all chips disabled, no popup on click.
+     -------------------------------------------------------------------------- */
   function renderSizes(p) {
     var wrap = el('modalSizes');
     var section = el('modalSizesWrap');
     if (!wrap || !section) return;
 
-    var sizes = Array.isArray(p.sizes) && p.sizes.length ? p.sizes : [];
-    if (!sizes.length) {
+    var chips = buildSizeChips(p);
+    if (!chips || !chips.length) {
       section.hidden = true;
+      section.classList.remove('is-disabled');
       wrap.innerHTML = '';
+      state.currentSize = null;
       return;
     }
+
     section.hidden = false;
     section.classList.remove('is-disabled');
 
-    var stock = normalizeStock(p.stock_status);
-    var disabled = (stock === 'out_of_stock');
-    if (disabled) section.classList.add('is-disabled');
+    var outOfStock = normalizeStock(p.stock_status) === 'out_of_stock';
+    if (outOfStock) section.classList.add('is-disabled');
 
     var html = '';
-    sizes.forEach(function (s) {
-      html += '<button type="button" class="size-chip' + (disabled ? ' is-disabled' : '') +
-              '" role="radio" aria-checked="false"' + (disabled ? ' disabled' : '') +
-              ' data-size="' + escAttr(s) + '">' + esc(s) + '</button>';
+    chips.forEach(function (item) {
+      var clickable = item.available && !outOfStock;
+      var sizeAvailable = !!item.available;
+      var dimmed = !sizeAvailable || outOfStock;
+
+      var cls = 'size-chip';
+      if (dimmed) cls += ' is-unavailable';
+      if (outOfStock) cls += ' is-disabled';
+
+      html += '<button type="button" class="' + cls + '"' +
+              ' role="radio" aria-checked="false"' +
+              ' data-size="' + escAttr(item.label) + '"' +
+              ' data-clickable="' + (clickable ? '1' : '0') + '"' +
+              ' data-size-available="' + (sizeAvailable ? '1' : '0') + '"' +
+              (outOfStock ? ' disabled' : '') + '>' +
+              esc(item.label) + '</button>';
     });
     wrap.innerHTML = html;
 
     Array.prototype.forEach.call(wrap.querySelectorAll('.size-chip'), function (btn) {
       btn.addEventListener('click', function () {
-        if (disabled) return;
-        Array.prototype.forEach.call(wrap.querySelectorAll('.size-chip'), function (b) {
-          b.classList.remove('is-active');
-          b.setAttribute('aria-checked', 'false');
-        });
-        btn.classList.add('is-active');
-        btn.setAttribute('aria-checked', 'true');
-        state.currentSize = btn.getAttribute('data-size');
-        updateModalWhatsApp();
+        var clickable = btn.getAttribute('data-clickable') === '1';
+        var sizeAvail = btn.getAttribute('data-size-available') === '1';
+        var sizeLabel = btn.getAttribute('data-size');
+
+        if (clickable) {
+          Array.prototype.forEach.call(wrap.querySelectorAll('.size-chip'), function (b) {
+            b.classList.remove('is-active');
+            b.setAttribute('aria-checked', 'false');
+          });
+          btn.classList.add('is-active');
+          btn.setAttribute('aria-checked', 'true');
+          state.currentSize = sizeLabel;
+          updateModalWhatsApp();
+        } else if (!sizeAvail && !outOfStock) {
+          openSizeUnavailablePopup(sizeLabel);
+        }
+        // out_of_stock: do nothing (button is disabled)
       });
     });
 
-    if (!disabled) {
-      var first = wrap.querySelector('.size-chip');
-      if (first) {
-        first.classList.add('is-active');
-        first.setAttribute('aria-checked', 'true');
-        state.currentSize = first.getAttribute('data-size');
+    if (!outOfStock) {
+      var firstAvail = wrap.querySelector('.size-chip[data-clickable="1"]');
+      if (firstAvail) {
+        firstAvail.classList.add('is-active');
+        firstAvail.setAttribute('aria-checked', 'true');
+        state.currentSize = firstAvail.getAttribute('data-size');
+      } else {
+        state.currentSize = null;
       }
     } else {
       state.currentSize = null;
     }
+  }
+
+  /* --------------------------------------------------------------------------
+     SIZE UNAVAILABLE POPUP — navy + gold, centered.
+     Closes with button, outside click or Esc.
+     -------------------------------------------------------------------------- */
+  function openSizeUnavailablePopup(sizeLabel) {
+    var root = el('popupRoot');
+    if (!root) return;
+
+    var title   = t('size_unavailable_title', 'Currently unavailable');
+    var message = t('size_unavailable_message',
+      'This size is not available right now. Please choose another size or message us on WhatsApp.');
+    var btnLbl  = t('size_unavailable_button', 'OK');
+
+    var fullMessage = 'Size ' + sizeLabel + ' — ' + message;
+
+    root.innerHTML =
+      '<div class="popup-overlay" id="sizePopup" role="dialog" aria-modal="true" ' +
+        'aria-labelledby="sizePopupTitle">' +
+        '<div class="popup-backdrop" data-popup-close></div>' +
+        '<div class="size-popup-card" role="document">' +
+          '<div class="popup-inner">' +
+            '<h3 class="popup-title" id="sizePopupTitle">' + esc(title) + '</h3>' +
+            '<p class="popup-subtitle">' + esc(fullMessage) + '</p>' +
+            '<button type="button" class="popup-btn" data-popup-close>' + esc(btnLbl) + '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    root.hidden = false;
+    document.body.classList.add('no-scroll');
+
+    Array.prototype.forEach.call(root.querySelectorAll('[data-popup-close]'), function (b) {
+      b.addEventListener('click', closeSizePopup);
+    });
+    document.addEventListener('keydown', sizePopupKeyHandler);
+
+    setTimeout(function () {
+      var okBtn = root.querySelector('.popup-btn');
+      if (okBtn) try { okBtn.focus(); } catch (e) {}
+    }, 40);
+  }
+
+  function sizePopupKeyHandler(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSizePopup();
+    }
+  }
+
+  function closeSizePopup() {
+    var root = el('popupRoot');
+    if (!root) return;
+    root.innerHTML = '';
+    root.hidden = true;
+    // Only remove body scroll lock if the product modal isn't also open.
+    if (!state.currentProduct) {
+      document.body.classList.remove('no-scroll');
+    }
+    document.removeEventListener('keydown', sizePopupKeyHandler);
   }
 
   function updateModalWhatsApp() {
@@ -1499,6 +1703,12 @@
     var ask  = el('modalAskRestock');
     var p    = state.currentProduct;
     if (!link || !p) return;
+
+    // Keep the Order button label in sync with site_content (fallback OK).
+    var orderSpan = link.querySelector('[data-content="order_button_text"]');
+    if (orderSpan) {
+      orderSpan.textContent = t('order_button_text', 'Order on WhatsApp');
+    }
 
     var num = (state.settings.business && state.settings.business.whatsapp) || CFG.WHATSAPP_NUMBER || '';
     var code = productCode(p.id, p.code);
@@ -1632,6 +1842,8 @@
       if (e.key !== 'Escape') return;
       var lb = el('lightbox');
       if (lb && !lb.hidden) { closeLightbox(); return; }
+      // If the size popup is open, let its own handler deal with Esc.
+      if (el('sizePopup')) return;
       if (document.querySelector('.va-backdrop:not([hidden])')) return;
       if (!modal.hidden) closeProductModal();
     });
@@ -1645,14 +1857,14 @@
     if (ratingBtn) {
       ratingBtn.addEventListener('click', function () {
         switchTab('reviews');
-        var t = el('tabReviews');
-        if (t) try { t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+        var t2 = el('tabReviews');
+        if (t2) try { t2.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
       });
     }
   }
 
   /* ==========================================================================
-     12. RATING UI — tab badge + summary box (THE FIX)
+     13. RATING UI — tab badge + summary box
      ========================================================================== */
 
   function updateTabReviewCount() {
@@ -1683,7 +1895,6 @@
 
     var stats = reviewStatsFor(state.currentProduct.id);
 
-    // Big average + fractional star row (0.0 when empty — never NaN)
     var bigAvg = el('reviewsAverage');
     if (bigAvg) bigAvg.textContent = stats.total ? stats.average.toFixed(1) : '0.0';
 
@@ -1700,14 +1911,11 @@
     var barsWrap = el('reviewsBars');
     if (!barsWrap) return;
 
-    // THE FIX: when there are 0 valid reviews, clear the bars.
-    // No empty 0% bars, no NaN, no 0/0.
     if (stats.total === 0) {
       barsWrap.innerHTML = '';
       return;
     }
 
-    // 5 → 1 star rows with count and pct = count / total * 100
     var html = '';
     for (var star = 5; star >= 1; star--) {
       var count = stats.stats[star] || 0;
@@ -1732,7 +1940,7 @@
   }
 
   /* ==========================================================================
-     13. REVIEWS LIST
+     14. REVIEWS LIST
      ========================================================================== */
 
   function renderReviewList() {
@@ -1840,7 +2048,7 @@
   }
 
   /* ==========================================================================
-     14. REVIEWS FORM
+     15. REVIEWS FORM
      ========================================================================== */
 
   function clearReviewFile() {
@@ -2151,8 +2359,6 @@
         }
         if (!name) name = user.email || 'Viona Customer';
 
-        // Write the rating to BOTH `rating` and `stars` when possible so the
-        // public display works regardless of which field the schema uses.
         var payload = {
           product_id: state.currentProduct.id,
           user_id: user.id,
@@ -2161,7 +2367,6 @@
           comment: comment,
           image_url: finalImageUrl
         };
-        // Try to also set `stars` when the table has it (harmless if not).
         try { payload.stars = rating; } catch (e) { /* ignore */ }
 
         if (existing && existing.id) {
@@ -2177,7 +2382,6 @@
         state.editingReview = false;
         clearReviewFile();
 
-        // Re-fetch and re-render so the summary bars use the new numbers.
         await loadAllReviews();
         renderGrid();
         renderModalRatingBadge();
@@ -2241,7 +2445,7 @@
   }
 
   /* ==========================================================================
-     15. LIGHTBOX
+     16. LIGHTBOX
      ========================================================================== */
 
   function openReviewLightbox(reviewId) {
@@ -2319,7 +2523,7 @@
   }
 
   /* ==========================================================================
-     16. IMAGE COMPRESSION
+     17. IMAGE COMPRESSION
      ========================================================================== */
 
   function compressImage(file, maxSide, quality) {
@@ -2360,7 +2564,7 @@
   }
 
   /* ==========================================================================
-     17. CATEGORY STRIP, MOBILE MENU, MISC
+     18. CATEGORY STRIP, MOBILE MENU, MISC
      ========================================================================== */
 
   function setupCategoryStrip() {
@@ -2468,7 +2672,7 @@
   }
 
   /* ==========================================================================
-     18. FAQ (Supabase only — no demo fallback)
+     19. FAQ
      ========================================================================== */
 
   async function loadFaqs() {
@@ -2527,7 +2731,7 @@
   }
 
   /* ==========================================================================
-     19. OFFERS (from site_settings)
+     20. OFFERS
      ========================================================================== */
 
   function pickOfferFields(settings) {
@@ -2616,7 +2820,7 @@
   }
 
   /* ==========================================================================
-     20. DEEP LINK
+     21. DEEP LINK
      ========================================================================== */
 
   function findProductByCodeOrId(code) {
@@ -2650,7 +2854,57 @@
   }
 
   /* ==========================================================================
-     21. INIT
+     22. RE-RENDER DYNAMIC STRINGS when site_content changes
+     ========================================================================== */
+
+  function refreshDynamicStrings() {
+    // 1) Empty-products message — only if the empty state is visible now.
+    var emptyBox = el('emptyBox');
+    if (emptyBox && !emptyBox.hidden && !state.products.length && !state.loadError) {
+      var msg = t('empty_products_message',
+        'No products available right now. Please check back soon.');
+      setEmptyState('Nothing to show yet', msg, false);
+    }
+
+    // 2) Order button label inside the modal.
+    var orderSpan = document.querySelector('#modalWhatsApp [data-content="order_button_text"]');
+    if (orderSpan) {
+      orderSpan.textContent = t('order_button_text', 'Order on WhatsApp');
+    }
+
+    // 3) Size popup title/message/button if the popup is currently open.
+    var popupTitleEl = el('sizePopupTitle');
+    if (popupTitleEl) {
+      popupTitleEl.textContent = t('size_unavailable_title', 'Currently unavailable');
+    }
+    var popupMsgEl = document.querySelector('#sizePopup .popup-subtitle');
+    if (popupMsgEl) {
+      var current = popupMsgEl.textContent || '';
+      var dash = current.indexOf(' — ');
+      var prefix = dash !== -1 ? current.slice(0, dash + 3) : '';
+      var baseMsg = t('size_unavailable_message',
+        'This size is not available right now. Please choose another size or message us on WhatsApp.');
+      popupMsgEl.textContent = prefix + baseMsg;
+    }
+    var popupBtnEl = document.querySelector('#sizePopup .popup-btn');
+    if (popupBtnEl) {
+      popupBtnEl.textContent = t('size_unavailable_button', 'OK');
+    }
+
+    // 4) Re-render size chips for the currently-open product so the new
+    //    all_sizes list (or changed text) is reflected immediately.
+    if (state.currentProduct) {
+      renderSizes(state.currentProduct);
+    }
+  }
+
+  // Listen early — brand.js may fire siteContentLoaded before init() finishes.
+  document.addEventListener('siteContentLoaded', function () {
+    try { refreshDynamicStrings(); } catch (e) { /* ignore */ }
+  });
+
+  /* ==========================================================================
+     23. INIT
      ========================================================================== */
 
   async function init() {
@@ -2737,6 +2991,10 @@
       var found = findProductByCodeOrId(m[1]);
       if (found) openProductById(found.id);
     });
+
+    // If site_content was already loaded before we finished init (rare),
+    // refresh dynamic strings now so nothing is stale.
+    refreshDynamicStrings();
   }
 
   if (document.readyState === 'loading') {
